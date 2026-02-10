@@ -36,7 +36,7 @@ export async function GET(
         }
 
         // Only allow access to published projects
-        if (!project.isPagePublished) {
+        if (!(project as any).isPagePublished) {
             return NextResponse.json({ error: 'Project not published' }, { status: 404 });
         }
 
