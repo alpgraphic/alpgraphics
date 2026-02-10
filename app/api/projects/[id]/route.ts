@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProjectsCollection } from '@/lib/mongodb';
-import { requireAdmin } from '@/lib/auth/session';
+import { requireAdmin, verifySession } from '@/lib/auth/session';
 import { ObjectId } from 'mongodb';
 
 // GET /api/projects/[id] - Get single project
@@ -9,21 +9,19 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const auth = await requireAdmin();
-        if (!auth.authorized) {
-            return NextResponse.json({ error: auth.error }, { status: 401 });
-        }
+        const auth = await verifySession();
+        const isAdmin = auth.authenticated && auth.role === 'admin';
 
         const { id } = await params;
         const collection = await getProjectsCollection();
 
         // Try to find by MongoDB ObjectId first, then by numeric id
         let project = null;
-        
+
         if (ObjectId.isValid(id)) {
             project = await collection.findOne({ _id: new ObjectId(id) } as any);
         }
-        
+
         if (!project) {
             // Try numeric ID
             const numericId = parseInt(id);
@@ -34,6 +32,11 @@ export async function GET(
 
         if (!project) {
             return NextResponse.json({ error: 'Proje bulunamadı' }, { status: 404 });
+        }
+
+        // Access check: If not published and not admin, block access
+        if (!(project as any).isPagePublished && !isAdmin) {
+            return NextResponse.json({ error: 'Bu projeye erişim yetkiniz yok' }, { status: 401 });
         }
 
         return NextResponse.json({ project });

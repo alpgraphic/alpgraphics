@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProjectsCollection } from '@/lib/mongodb';
-import { requireAdmin } from '@/lib/auth/session';
+import { requireAdmin, verifySession } from '@/lib/auth/session';
 
 // Allowed fields for project creation/listing
 const ALLOWED_PROJECT_FIELDS = [
@@ -12,16 +12,30 @@ const ALLOWED_PROJECT_FIELDS = [
     'accountId',
 ];
 
-// GET - List all projects (Admin only)
+// GET - List all projects
 export async function GET() {
     try {
-        const auth = await requireAdmin();
-        if (!auth.authorized) {
-            return NextResponse.json({ error: auth.error }, { status: 401 });
-        }
+        const auth = await verifySession();
+        const isAdmin = auth.authenticated && auth.role === 'admin';
 
         const collection = await getProjectsCollection();
-        const projects = await collection.find({}).toArray();
+
+        // If not admin, only show published projects
+        const filter = isAdmin ? {} : { isPagePublished: true };
+
+        // Optimization: Don't return heavy blocks in the list view
+        // to keep payload small and fast.
+        const projects = await collection.find(filter, {
+            projection: {
+                pageBlocks: 0,
+                brandData: 0,
+                brandGuide: 0,
+                projectAssets: 0,
+                tasks: 0,
+                files: 0,
+                team: 0
+            }
+        }).toArray();
 
         return NextResponse.json({ projects });
     } catch (error) {
