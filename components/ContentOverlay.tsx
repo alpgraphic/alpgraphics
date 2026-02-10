@@ -168,9 +168,9 @@ function WorkContent({ onSectionChange }: { onSectionChange?: (section: SectionT
                                 <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-gradient-to-br from-[#f5f3e9] to-[#e8e6dc] mb-4 border border-current/5">
                                     <div className="absolute inset-0 flex items-center justify-center p-4">
                                         {/* Use Brand Logo (light or dark), Project Image, or fallback to initials */}
-                                        {(project.brandData?.logos?.light || project.brandData?.logos?.dark || project.brandData?.logos?.primary) ? (
+                                        {(project.brandData?.logos?.dark || project.brandData?.logos?.primary || project.brandData?.logos?.light) ? (
                                             <img
-                                                src={project.brandData.logos.light || project.brandData.logos.dark || project.brandData.logos.primary}
+                                                src={project.brandData.logos.dark || project.brandData.logos.primary || project.brandData.logos.light}
                                                 alt={project.title}
                                                 className="w-[70%] h-[70%] object-contain opacity-80 group-hover:opacity-100 transition-opacity"
                                             />
