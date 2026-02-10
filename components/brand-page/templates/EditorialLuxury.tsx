@@ -33,16 +33,16 @@ export default function EditorialLuxury({ brandPage }: EditorialLuxuryProps) {
     };
 
     // Select appropriate logo based on hero background
-    const heroLogo = aiDecisions?.heroBackground?.includes('#')
+    const heroLogo = (aiDecisions?.heroBackground?.startsWith('#') && aiDecisions.heroBackground.length === 7)
         ? (parseInt(aiDecisions.heroBackground.slice(1), 16) > 0x888888 ? logos.dark : logos.light)
-        : logos.light;
+        : (logos.dark || logos.light);
 
     return (
         <div className="min-h-screen w-full">
             {/* Hero Section - Always visible */}
             {isEnabled('hero') && (
                 <HeroSection
-                    logoUrl={heroLogo || logos.light || ''}
+                    logoUrl={heroLogo || logos.dark || logos.light || ''}
                     categoryLabel={brandPage.heroConfig?.categoryLabel || "Brand Identity"}
                     categoryLabelColor={brandPage.heroConfig?.categoryLabelColor}
                     copyrightText={brandPage.heroConfig?.copyrightText || `© ${brandName}`}
