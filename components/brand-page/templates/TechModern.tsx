@@ -77,7 +77,7 @@ export default function TechModern({ brandPage }: TechModernProps) {
                                 src={logos.light}
                                 alt={brandName}
                                 className="object-contain"
-                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize * 0.5}px` }}
+                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize}px` }}
                             />
                         ) : (
                             <h1 className="text-6xl md:text-8xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent" style={headingFontStyle}>

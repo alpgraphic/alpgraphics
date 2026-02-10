@@ -26,6 +26,15 @@ export default function ColorSection({
 }: ColorSectionProps) {
     const [copiedColor, setCopiedColor] = useState<string | null>(null);
 
+    // Compute RGB from hex (fallback for missing/stale rgb values)
+    const hexToRgb = (hex: string): string => {
+        const clean = hex.replace('#', '');
+        const r = parseInt(clean.slice(0, 2), 16);
+        const g = parseInt(clean.slice(2, 4), 16);
+        const b = parseInt(clean.slice(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+    };
+
     const copyToClipboard = (hex: string) => {
         navigator.clipboard.writeText(hex);
         setCopiedColor(hex);
@@ -91,12 +100,10 @@ export default function ColorSection({
                                         <span className="opacity-40 text-[10px] uppercase tracking-wider mr-2">HEX</span>
                                         {color.hex}
                                     </p>
-                                    {color.rgb && (
-                                        <p className="opacity-60">
-                                            <span className="opacity-40 text-[10px] uppercase tracking-wider mr-2">RGB</span>
-                                            {color.rgb}
-                                        </p>
-                                    )}
+                                    <p className="opacity-60">
+                                        <span className="opacity-40 text-[10px] uppercase tracking-wider mr-2">RGB</span>
+                                        {hexToRgb(color.hex)}
+                                    </p>
                                     {color.cmyk && (
                                         <p className="opacity-60">
                                             <span className="opacity-40 text-[10px] uppercase tracking-wider mr-2">CMYK</span>

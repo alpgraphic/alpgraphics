@@ -69,7 +69,7 @@ export default function MinimalClean({ brandPage }: MinimalCleanProps) {
                                 src={logos.dark}
                                 alt={brandName}
                                 className="object-contain"
-                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize * 0.5}px` }}
+                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize}px` }}
                             />
                         ) : (
                             <h1 className="text-6xl md:text-8xl font-light tracking-tight" style={headingFontStyle}>

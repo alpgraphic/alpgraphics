@@ -95,7 +95,7 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                 src={logos.dark}
                                 alt={brandName}
                                 className="object-contain mx-auto"
-                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize * 0.5}px` }}
+                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize}px` }}
                             />
                         ) : (
                             <h1 className="text-7xl md:text-9xl font-black tracking-tight" style={headingFontStyle}>
@@ -325,7 +325,10 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                             <p className="text-sm font-mono text-white/60 mt-1">{color.hex}</p>
                                         </div>
                                         <div className="text-right text-xs text-white/40 font-mono">
-                                            {color.rgb && <p>RGB: {color.rgb}</p>}
+                                            <p>RGB: {(() => {
+                                                const c = color.hex.replace('#', '');
+                                                return `${parseInt(c.slice(0,2),16)}, ${parseInt(c.slice(2,4),16)}, ${parseInt(c.slice(4,6),16)}`;
+                                            })()}</p>
                                         </div>
                                     </div>
                                 </motion.div>

@@ -28,6 +28,15 @@ export default function EditPanel({
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<string>('');
 
+    // Helper: convert hex to RGB string
+    const hexToRgb = (hex: string): string => {
+        const clean = hex.replace('#', '');
+        const r = parseInt(clean.slice(0, 2), 16);
+        const g = parseInt(clean.slice(2, 4), 16);
+        const b = parseInt(clean.slice(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+    };
+
     // Fix: Weak comparison or string conversion for ID match
     const selectedAccount = accounts.find(a => String(a.id) === String(brandPage.linkedAccountId));
 
@@ -640,7 +649,8 @@ export default function EditPanel({
                                             value={color.hex}
                                             onChange={(e) => {
                                                 const updated = [...(brandPage.colors?.colors || [])];
-                                                updated[index] = { ...updated[index], hex: e.target.value };
+                                                const newHex = e.target.value;
+                                                updated[index] = { ...updated[index], hex: newHex, rgb: hexToRgb(newHex) };
                                                 onUpdate({
                                                     colors: { ...brandPage.colors, colors: updated }
                                                 });
@@ -678,10 +688,11 @@ export default function EditPanel({
                             {/* Add Color Button */}
                             <button
                                 onClick={() => {
+                                    const defaultHex = '#000000';
                                     const newColor = {
                                         name: 'New Color',
-                                        hex: '#000000',
-                                        rgb: '0, 0, 0'
+                                        hex: defaultHex,
+                                        rgb: hexToRgb(defaultHex)
                                     };
                                     onUpdate({
                                         colors: {

@@ -78,7 +78,7 @@ export default function OrganicNatural({ brandPage }: OrganicNaturalProps) {
                                 src={logos.dark}
                                 alt={brandName}
                                 className="object-contain"
-                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize * 0.5}px` }}
+                                style={{ maxWidth: `${heroLogoSize}px`, maxHeight: `${heroLogoSize}px` }}
                             />
                         ) : (
                             <h1 className="text-5xl md:text-7xl font-normal tracking-tight italic" style={{ color: warmBrown, ...headingFontStyle }}>

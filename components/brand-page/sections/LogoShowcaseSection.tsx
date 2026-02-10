@@ -54,8 +54,8 @@ export default function LogoShowcaseSection({
 
                 {/* Logo Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-                    {/* Primary Logo Light */}
-                    {logos.light && (
+                    {/* Dark Logo on Light Background */}
+                    {logos.dark && (
                         <motion.div
                             initial={{ opacity: 0, y: 40 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -65,10 +65,10 @@ export default function LogoShowcaseSection({
                         >
                             <div className="bg-[#f5f3e9] rounded-2xl p-16 aspect-[4/3] flex items-center justify-center relative overflow-hidden">
                                 <img
-                                    src={logos.light}
-                                    alt="Logo Light"
+                                    src={logos.dark}
+                                    alt="Logo Dark"
                                     className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
-                                    style={{ maxHeight: `${logoLightSize}px` }}
+                                    style={{ maxHeight: `${logoDarkSize}px` }}
                                 />
                             </div>
                             <div className="mt-4 text-center">
@@ -78,8 +78,8 @@ export default function LogoShowcaseSection({
                         </motion.div>
                     )}
 
-                    {/* Primary Logo Dark */}
-                    {logos.dark && (
+                    {/* Light Logo on Dark Background */}
+                    {logos.light && (
                         <motion.div
                             initial={{ opacity: 0, y: 40 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -89,10 +89,10 @@ export default function LogoShowcaseSection({
                         >
                             <div className="bg-[#1a1a1a] rounded-2xl p-16 aspect-[4/3] flex items-center justify-center relative overflow-hidden">
                                 <img
-                                    src={logos.dark}
-                                    alt="Logo Dark"
+                                    src={logos.light}
+                                    alt="Logo Light"
                                     className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
-                                    style={{ maxHeight: `${logoDarkSize}px` }}
+                                    style={{ maxHeight: `${logoLightSize}px` }}
                                 />
                             </div>
                             <div className="mt-4 text-center">
