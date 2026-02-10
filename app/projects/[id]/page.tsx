@@ -4,25 +4,61 @@ import { useAgency, Project } from "@/context/AgencyContext";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BlockRenderer from "@/components/editor/BlockRenderer";
 import EditorialLuxury from "@/components/brand-page/templates/EditorialLuxury";
+import MinimalClean from "@/components/brand-page/templates/MinimalClean";
+import BoldPlayful from "@/components/brand-page/templates/BoldPlayful";
+import TechModern from "@/components/brand-page/templates/TechModern";
+import OrganicNatural from "@/components/brand-page/templates/OrganicNatural";
+
+// Template renderer based on brandData.template
+function BrandPageRenderer({ brandData }: { brandData: any }) {
+    const template = brandData.template || 'EditorialLuxury';
+    switch (template) {
+        case 'MinimalClean': return <MinimalClean brandPage={brandData} />;
+        case 'BoldPlayful': return <BoldPlayful brandPage={brandData} />;
+        case 'TechModern': return <TechModern brandPage={brandData} />;
+        case 'OrganicNatural': return <OrganicNatural brandPage={brandData} />;
+        default: return <EditorialLuxury brandPage={brandData} />;
+    }
+}
 
 export default function ProjectPage() {
     const params = useParams();
     const { projects } = useAgency();
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [publicProject, setPublicProject] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
 
     // Support both string and numeric IDs
     const rawId = params.id as string;
     const project = projects.find(p => String(p.id) === rawId);
 
-    // Check if this is a brand page project with brandData
-    const isBrandPage = project?.category === 'Brand Page' && project?.brandData;
+    // Fetch from public API if not found in context
+    useEffect(() => {
+        if (!project) {
+            fetch(`/api/public/projects/${rawId}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (data?.project) setPublicProject(data.project);
+                })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+        } else {
+            setLoading(false);
+        }
+    }, [project, rawId]);
 
-    // If brand page with brandData, render brand template
-    if (isBrandPage && project?.brandData) {
-        return <EditorialLuxury brandPage={project.brandData} />;
+    // Use admin project or public fallback
+    const activeProject = project || publicProject;
+
+    // Check if this is a brand page project with brandData
+    const isBrandPage = activeProject?.category === 'Brand Page' && activeProject?.brandData;
+
+    // If brand page with brandData, render correct template
+    if (isBrandPage && activeProject?.brandData) {
+        return <BrandPageRenderer brandData={activeProject.brandData} />;
     }
 
     // Find next and previous projects (exclude internal)
@@ -31,7 +67,19 @@ export default function ProjectPage() {
     const prevProject = currentIndex > 0 ? publicProjects[currentIndex - 1] : null;
     const nextProject = currentIndex < publicProjects.length - 1 ? publicProjects[currentIndex + 1] : null;
 
-    if (!project) {
+    // Loading state while fetching from public API
+    if (loading && !activeProject) {
+        return (
+            <div className="min-h-screen bg-[#f5f3e9] text-[#1a1a1a] flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-2 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-sm opacity-40">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!activeProject) {
         return (
             <div className="min-h-screen bg-[#f5f3e9] text-[#1a1a1a] flex items-center justify-center">
                 <div className="text-center">
@@ -46,7 +94,7 @@ export default function ProjectPage() {
     }
 
     // Check if project has page blocks (using page builder)
-    const hasPageBlocks = project.pageBlocks && project.pageBlocks.length > 0;
+    const hasPageBlocks = activeProject.pageBlocks && activeProject.pageBlocks.length > 0;
 
     // If using page builder, render blocks
     if (hasPageBlocks) {

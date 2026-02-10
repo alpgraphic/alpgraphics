@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { useAgency, Project } from "@/context/AgencyContext";
 
@@ -103,28 +103,26 @@ export function ContentOverlay({ activeSection, onClose, onSectionChange, isNigh
 
 function WorkContent({ onSectionChange }: { onSectionChange?: (section: SectionType) => void }) {
     const { projects } = useAgency();
+    const [publicProjects, setPublicProjects] = useState<any[]>([]);
+
+    // Fetch from public API (works without admin auth)
+    useEffect(() => {
+        fetch('/api/public/projects')
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.projects) setPublicProjects(data.projects);
+            })
+            .catch(() => {});
+    }, []);
+
+    // Use admin projects if available, otherwise fall back to public API
+    const allProjects = projects.length > 0 ? projects : publicProjects;
 
     // Filter Brand Pages - show ONLY published brand pages
-    const brandProjects = projects.filter(p => {
+    const brandProjects = allProjects.filter((p: any) => {
         const isBrandPage = p.category === 'Brand Page' || p.category === 'Brand Value';
         const isPublished = p.isPagePublished === true || p.status === 'Completed';
-
         return isBrandPage && isPublished;
-    });
-
-    // Debug: Log filtering details
-    console.log('🔍 WorkContent - Filtering brand pages:', {
-        totalProjects: projects.length,
-        brandPagesFound: projects.filter(p => p.category === 'Brand Page' || p.category === 'Brand Value').length,
-        publishedBrandPages: brandProjects.length,
-        allProjects: projects.map(p => ({
-            id: p.id,
-            title: p.title,
-            category: p.category,
-            isPagePublished: p.isPagePublished,
-            status: p.status,
-            willShow: (p.category === 'Brand Page' || p.category === 'Brand Value') && (p.isPagePublished === true || p.status === 'Completed')
-        }))
     });
 
     return (
