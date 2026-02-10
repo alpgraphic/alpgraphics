@@ -1,0 +1,110 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+    const path = request.nextUrl.pathname;
+    const method = request.method;
+
+    // ─── SECURITY HEADERS ───
+    const response = NextResponse.next();
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-XSS-Protection', '1; mode=block');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    // ─── ORIGIN CHECK (CSRF Protection via Origin/Referer) ───
+    // Protects state-changing API requests from cross-origin attacks
+    if (path.startsWith('/api/') && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        const exemptPaths = [
+            '/api/auth/login',
+            '/api/auth/setup',
+            '/api/auth/verify-2fa',
+            '/api/csrf',
+            '/api/brief/',
+            '/api/exchange-rates',
+            '/api/mobile/',
+        ];
+        const isExempt = exemptPaths.some(exempt => path.startsWith(exempt));
+
+        if (!isExempt) {
+            const origin = request.headers.get('origin');
+            const referer = request.headers.get('referer');
+            const host = request.headers.get('host');
+
+            // In production, verify origin matches host
+            if (origin && host) {
+                const originHost = new URL(origin).host;
+                if (originHost !== host) {
+                    return NextResponse.json(
+                        { error: 'Cross-origin request rejected' },
+                        { status: 403 }
+                    );
+                }
+            } else if (referer && host) {
+                const refererHost = new URL(referer).host;
+                if (refererHost !== host) {
+                    return NextResponse.json(
+                        { error: 'Cross-origin request rejected' },
+                        { status: 403 }
+                    );
+                }
+            }
+            // If neither origin nor referer present in production, block
+            // (browsers always send origin for POST/PUT/DELETE)
+            if (process.env.NODE_ENV === 'production' && !origin && !referer) {
+                return NextResponse.json(
+                    { error: 'Missing origin header' },
+                    { status: 403 }
+                );
+            }
+        }
+    }
+
+    // ─── ADMIN ROUTE PROTECTION ───
+    // Allow setup page without auth (it self-protects if admin already exists)
+    if (path === '/admin/setup') {
+        return response;
+    }
+
+    if (path.startsWith('/admin')) {
+        const sessionToken = request.cookies.get('session_token')?.value;
+        const userRole = request.cookies.get('user_role')?.value;
+
+        if (!sessionToken || userRole !== 'admin') {
+            const res = NextResponse.redirect(new URL('/login', request.url));
+            if (sessionToken && userRole !== 'admin') {
+                res.cookies.delete('session_token');
+                res.cookies.delete('user_role');
+            }
+            return res;
+        }
+
+        // Token format validation
+        if (sessionToken.length < 32) {
+            const res = NextResponse.redirect(new URL('/login', request.url));
+            res.cookies.delete('session_token');
+            res.cookies.delete('user_role');
+            return res;
+        }
+    }
+
+    // ─── CLIENT PORTAL PROTECTION ───
+    if (path.startsWith('/client')) {
+        const sessionToken = request.cookies.get('session_token')?.value;
+        const userRole = request.cookies.get('user_role')?.value;
+
+        if (!sessionToken || (userRole !== 'client' && userRole !== 'admin')) {
+            return NextResponse.redirect(new URL('/login', request.url));
+        }
+    }
+
+    return response;
+}
+
+export const config = {
+    matcher: [
+        '/admin/:path*',
+        '/client/:path*',
+        '/api/:path*',
+    ],
+};

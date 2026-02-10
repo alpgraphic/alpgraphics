@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "alpgraphics",
+    "slug": "alpgraphics",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f5f3e9"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.alpgraphics.client",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Hızlı giriş için Face ID kullanın"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f5f3e9"
+      },
+      "package": "com.alpgraphics.client",
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Hızlı giriş için Face ID kullanın"
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}
