@@ -43,7 +43,7 @@ export default function ProjectPage() {
                 .then(data => {
                     if (data?.project) setPublicProject(data.project);
                 })
-                .catch(() => {})
+                .catch(() => { })
                 .finally(() => setLoading(false));
         } else {
             setLoading(false);
@@ -118,8 +118,8 @@ export default function ProjectPage() {
 
                 {/* Render Page Blocks */}
                 {activeProject.pageBlocks!
-                    .sort((a, b) => a.order - b.order)
-                    .map(block => (
+                    .sort((a: any, b: any) => a.order - b.order)
+                    .map((block: any) => (
                         <BlockRenderer
                             key={block.id}
                             block={block}
@@ -253,8 +253,8 @@ export default function ProjectPage() {
                         <h2 className="text-3xl font-[900] tracking-tight mb-12">Gallery</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {activeProject.gallery
-                                .sort((a, b) => a.order - b.order)
-                                .map((item) => (
+                                .sort((a: any, b: any) => a.order - b.order)
+                                .map((item: any) => (
                                     <motion.div
                                         key={item.id}
                                         whileHover={{ scale: 1.02 }}
