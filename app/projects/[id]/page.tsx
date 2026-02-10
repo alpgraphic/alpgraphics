@@ -51,7 +51,7 @@ export default function ProjectPage() {
     }, [project, rawId]);
 
     // Use admin project or public fallback
-    const activeProject = project || publicProject;
+    const activeProject: any = project || publicProject;
 
     // Check if this is a brand page project with brandData
     const isBrandPage = activeProject?.category === 'Brand Page' && activeProject?.brandData;
