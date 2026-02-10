@@ -28,7 +28,7 @@ export async function GET(
 
         // Then try by string id
         if (!project) {
-            project = await collection.findOne({ id: id });
+            project = await collection.findOne({ id: id } as any);
         }
 
         if (!project) {
