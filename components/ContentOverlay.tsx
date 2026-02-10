@@ -172,7 +172,7 @@ function WorkContent({ onSectionChange }: { onSectionChange?: (section: SectionT
                                             <img
                                                 src={project.brandData.logos.dark || project.brandData.logos.primary || project.brandData.logos.light}
                                                 alt={project.title}
-                                                className="w-[70%] h-[70%] object-contain opacity-80 group-hover:opacity-100 transition-opacity"
+                                                className="w-[85%] h-[85%] object-contain opacity-80 group-hover:opacity-100 transition-opacity"
                                             />
                                         ) : project.image ? (
                                             <img
