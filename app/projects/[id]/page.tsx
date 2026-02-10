@@ -117,7 +117,7 @@ export default function ProjectPage() {
                 <div className="h-20" />
 
                 {/* Render Page Blocks */}
-                {project.pageBlocks!
+                {activeProject.pageBlocks!
                     .sort((a, b) => a.order - b.order)
                     .map(block => (
                         <BlockRenderer
@@ -190,18 +190,18 @@ export default function ProjectPage() {
                     {/* Category & Year */}
                     <div className="mb-6">
                         <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                            {project.category} — {project.year}
+                            {activeProject.category} — {activeProject.year}
                         </span>
                     </div>
 
                     {/* Title */}
                     <h1 className="text-5xl md:text-8xl lg:text-9xl font-[900] tracking-tighter leading-none mb-8">
-                        {project.title}
+                        {activeProject.title}
                     </h1>
 
                     {/* Description */}
                     <p className="text-xl md:text-2xl leading-relaxed opacity-70 max-w-3xl">
-                        {project.description}
+                        {activeProject.description}
                     </p>
                 </motion.div>
             </section>
@@ -216,8 +216,8 @@ export default function ProjectPage() {
                 <div className="max-w-7xl mx-auto">
                     <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-black/5">
                         <img
-                            src={project.image}
-                            alt={project.title}
+                            src={activeProject.image}
+                            alt={activeProject.title}
                             className="w-full h-full object-cover"
                         />
                     </div>
@@ -229,30 +229,30 @@ export default function ProjectPage() {
                 <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">Client</h3>
-                        <p className="text-lg font-medium">{project.client}</p>
+                        <p className="text-lg font-medium">{activeProject.client}</p>
                     </div>
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">Year</h3>
-                        <p className="text-lg font-medium">{project.year}</p>
+                        <p className="text-lg font-medium">{activeProject.year}</p>
                     </div>
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">Category</h3>
-                        <p className="text-lg font-medium">{project.category}</p>
+                        <p className="text-lg font-medium">{activeProject.category}</p>
                     </div>
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">Role</h3>
-                        <p className="text-lg font-medium">{project.role || "Art Direction, Design"}</p>
+                        <p className="text-lg font-medium">{activeProject.role || "Art Direction, Design"}</p>
                     </div>
                 </div>
             </section>
 
             {/* Gallery Section */}
-            {project.gallery && project.gallery.length > 0 && (
+            {activeProject.gallery && activeProject.gallery.length > 0 && (
                 <section className="px-6 md:px-20 py-20">
                     <div className="max-w-7xl mx-auto">
                         <h2 className="text-3xl font-[900] tracking-tight mb-12">Gallery</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {project.gallery
+                            {activeProject.gallery
                                 .sort((a, b) => a.order - b.order)
                                 .map((item) => (
                                     <motion.div
@@ -263,7 +263,7 @@ export default function ProjectPage() {
                                     >
                                         <img
                                             src={item.imageData}
-                                            alt={item.caption || project.title}
+                                            alt={item.caption || activeProject.title}
                                             className="w-full h-auto object-cover"
                                         />
                                         {item.caption && (
@@ -277,13 +277,13 @@ export default function ProjectPage() {
             )}
 
             {/* Testimonial */}
-            {project.testimonial && (
+            {activeProject.testimonial && (
                 <section className="px-6 md:px-20 py-20 bg-[#1a1a1a] text-[#f5f3e9]">
                     <div className="max-w-4xl mx-auto text-center">
                         <blockquote className="text-2xl md:text-4xl font-[500] leading-relaxed mb-8 italic">
-                            "{project.testimonial.quote}"
+                            "{activeProject.testimonial.quote}"
                         </blockquote>
-                        <p className="text-lg font-bold">{project.testimonial.author}</p>
+                        <p className="text-lg font-bold">{activeProject.testimonial.author}</p>
                     </div>
                 </section>
             )}
