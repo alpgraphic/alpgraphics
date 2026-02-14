@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth/session';
 
 // Dynamic import to handle missing @vercel/blob package
 let vercelBlobDel: ((url: string) => Promise<void>) | null = null;
@@ -17,10 +18,16 @@ try {
 
 /**
  * DELETE /api/upload/delete
- * Delete a file from Vercel Blob Storage
+ * Delete a file from Vercel Blob Storage (Admin only)
  */
 export async function DELETE(request: NextRequest) {
     try {
+        // Auth check - only admin can delete files
+        const auth = await requireAdmin();
+        if (!auth.authorized) {
+            return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
+        }
+
         if (!vercelBlobDel) {
             return NextResponse.json(
                 { success: false, error: '@vercel/blob not installed' },
@@ -30,9 +37,17 @@ export async function DELETE(request: NextRequest) {
 
         const { url } = await request.json();
 
-        if (!url) {
+        if (!url || typeof url !== 'string') {
             return NextResponse.json(
                 { success: false, error: 'URL is required' },
+                { status: 400 }
+            );
+        }
+
+        // Validate URL belongs to our Vercel Blob store
+        if (!url.includes('vercel-storage.com') && !url.includes('blob.vercel-storage.com')) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid storage URL' },
                 { status: 400 }
             );
         }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProposalsCollection } from '@/lib/mongodb';
 import { requireAdmin } from '@/lib/auth/session';
+import { ObjectId } from 'mongodb';
 
 // GET - List all proposals (Admin only)
 export async function GET() {
@@ -136,9 +137,23 @@ export async function DELETE(request: NextRequest) {
         }
 
         const collection = await getProposalsCollection();
-        const result = await collection.deleteOne({ id: parseInt(id) });
 
-        if (result.deletedCount === 0) {
+        let result;
+
+        // Try MongoDB ObjectId first
+        if (ObjectId.isValid(id)) {
+            result = await collection.deleteOne({ _id: new ObjectId(id) } as any);
+        }
+
+        // If not found, try numeric ID
+        if (!result || result.deletedCount === 0) {
+            const numericId = parseInt(id);
+            if (!isNaN(numericId)) {
+                result = await collection.deleteOne({ id: numericId });
+            }
+        }
+
+        if (!result || result.deletedCount === 0) {
             return NextResponse.json({ error: 'Teklif bulunamadı' }, { status: 404 });
         }
 

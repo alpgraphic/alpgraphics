@@ -753,6 +753,9 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     };
 
     const addTransaction = async (accountId: number | string, transaction: AccountTransaction) => {
+        // Save previous state for revert
+        const previousAccounts = [...accounts];
+
         // Optimistic UI Update
         const tempId = Date.now();
         setAccounts(prev => prev.map(account => {
@@ -782,17 +785,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             });
 
             if (!res.ok) {
-                // Revert on error? For now just alert
-                console.error("Failed to save transaction");
-                // In a perfect world we rever state here
-            } else {
-                // Maybe refetch accounts to get exact server state?
-                // Or just assume optimistic update was correct.
-                // For 'Cari Hesap', correctness is key.
+                // Revert state on API error
+                console.error("Failed to save transaction, reverting...");
+                setAccounts(previousAccounts);
+                alert('İşlem kaydedilemedi. Lütfen tekrar deneyin.');
             }
 
         } catch (error) {
             console.error("Transaction API error", error);
+            // Revert state on network error
+            setAccounts(previousAccounts);
+            alert('Sunucuya bağlanılamadı. İşlem geri alındı.');
         }
     };
 

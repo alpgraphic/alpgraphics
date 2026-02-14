@@ -9,6 +9,7 @@ import CommandBar from "@/components/admin/CommandBar";
 import ProposalPrintTemplate from "@/components/admin/ProposalPrintTemplate";
 import SceneSettings from "@/components/admin/SceneSettings";
 import SEOSettings from "@/components/admin/SEOSettings";
+import CacheManager from "@/components/admin/CacheManager";
 // AIBrandGenerator removed - replaced with Brand Pages system
 
 export default function AdminDashboard() {
@@ -342,6 +343,7 @@ export default function AdminDashboard() {
                         { id: 'finance', name: 'Finance', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg> },
                         { id: 'scene-settings', name: 'Scene', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
                         { id: 'seo', name: 'SEO Settings', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg> },
+                        { id: 'cache', name: 'Cache', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg> },
                         { id: 'dev-status', name: 'System Log', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
                         { id: 'inbox', name: 'Inbox', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> },
                     ].map(item => (
@@ -423,6 +425,7 @@ export default function AdminDashboard() {
                             {activeTab === 'briefs' && 'Client Briefs'}
                             {activeTab === 'scene-settings' && 'Scene Settings'}
                             {activeTab === 'seo' && 'SEO Ayarları'}
+                            {activeTab === 'cache' && 'Cache Yönetimi'}
                         </h2>
                         <p className="opacity-40 text-xs mt-2 uppercase tracking-widest">
                             {activeTab === 'overview' && 'Business Overview'}
@@ -436,6 +439,7 @@ export default function AdminDashboard() {
                             {activeTab === 'briefs' && 'Müşteri Brief Formları'}
                             {activeTab === 'scene-settings' && 'Anasayfa 3D Sahne Yönetimi'}
                             {activeTab === 'seo' && 'Meta Başlık, Açıklama ve Sayfa Ayarları'}
+                            {activeTab === 'cache' && 'Oturum, Rate Limit ve Önbellek Temizliği'}
                             <span className="mx-2 opacity-30">•</span>
                             {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </p>
@@ -1166,6 +1170,11 @@ export default function AdminDashboard() {
                 {/* SEO Settings View */}
                 {activeTab === 'seo' && (
                     <SEOSettings isAdminNight={isAdminNight} />
+                )}
+
+                {/* Cache Management View */}
+                {activeTab === 'cache' && (
+                    <CacheManager isAdminNight={isAdminNight} />
                 )}
 
             </main>
