@@ -25,6 +25,23 @@ const templateComponents = {
 export default function LivePreview({ brandPage }: LivePreviewProps) {
     const TemplateComponent = templateComponents[brandPage.template] || EditorialLuxury;
 
+    // Sanitize font name/URL to prevent CSS injection
+    const sanitizeCSSValue = (value: string): string => {
+        // Remove characters that could break out of CSS context
+        return value.replace(/['"\\;{}()]/g, '').trim();
+    };
+
+    const isValidFontUrl = (url: string): boolean => {
+        // Only allow data: URIs (base64), blob: URIs, and same-origin URLs
+        if (url.startsWith('data:') || url.startsWith('blob:')) return true;
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.origin === window.location.origin;
+        } catch {
+            return false;
+        }
+    };
+
     // Inject custom fonts into CSS
     useEffect(() => {
         const styleId = 'brand-page-custom-fonts';
@@ -40,24 +57,32 @@ export default function LivePreview({ brandPage }: LivePreviewProps) {
 
         // Heading font
         if (brandPage.fonts?.heading?.file && brandPage.fonts?.heading?.name) {
-            fontFaces += `
-                @font-face {
-                    font-family: '${brandPage.fonts.heading.name}';
-                    src: url('${brandPage.fonts.heading.file}');
-                    font-display: swap;
-                }
-            `;
+            const fontUrl = brandPage.fonts.heading.file;
+            const fontName = sanitizeCSSValue(brandPage.fonts.heading.name);
+            if (isValidFontUrl(fontUrl) && fontName) {
+                fontFaces += `
+                    @font-face {
+                        font-family: '${fontName}';
+                        src: url('${fontUrl}');
+                        font-display: swap;
+                    }
+                `;
+            }
         }
 
         // Body font
         if (brandPage.fonts?.body?.file && brandPage.fonts?.body?.name) {
-            fontFaces += `
-                @font-face {
-                    font-family: '${brandPage.fonts.body.name}';
-                    src: url('${brandPage.fonts.body.file}');
-                    font-display: swap;
-                }
-            `;
+            const fontUrl = brandPage.fonts.body.file;
+            const fontName = sanitizeCSSValue(brandPage.fonts.body.name);
+            if (isValidFontUrl(fontUrl) && fontName) {
+                fontFaces += `
+                    @font-face {
+                        font-family: '${fontName}';
+                        src: url('${fontUrl}');
+                        font-display: swap;
+                    }
+                `;
+            }
         }
 
         styleEl.textContent = fontFaces;

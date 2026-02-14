@@ -52,10 +52,17 @@ async function fetchTCMBRates(): Promise<{ USD: number; EUR: number; GBP: number
             return match ? parseFloat(match[1]) : 0;
         };
 
+        const usd = getRate('USD');
+        const eur = getRate('EUR');
+        const gbp = getRate('GBP');
+
+        // Validate rates are reasonable (above 1 TRY, below 1000 TRY)
+        const isValid = (rate: number) => rate > 1 && rate < 1000;
+
         return {
-            USD: getRate('USD') || 43.50, // Fallback (güncellendi: Şubat 2026)
-            EUR: getRate('EUR') || 51.30,
-            GBP: getRate('GBP') || 58.00,
+            USD: isValid(usd) ? usd : 43.50, // Fallback (güncellendi: Şubat 2026)
+            EUR: isValid(eur) ? eur : 51.30,
+            GBP: isValid(gbp) ? gbp : 58.00,
         };
     } catch (error) {
         console.error('TCMB fetch error:', error);

@@ -14,7 +14,14 @@ import { MongoClient, Db, Collection } from 'mongodb';
 
 // Connection
 const uri = process.env.MONGODB_URI || '';
-const options = {};
+const options = {
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    maxIdleTimeMS: 30000,
+    waitQueueTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;

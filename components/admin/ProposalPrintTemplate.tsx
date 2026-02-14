@@ -250,7 +250,7 @@ export default function ProposalPrintTemplate({ proposal, onClose }: ProposalPri
                 </style>
             </head>
             <body>
-                ${printContent.innerHTML}
+                ${printContent.innerHTML.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')}
             </body>
             </html>
         `);

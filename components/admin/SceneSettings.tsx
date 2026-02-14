@@ -32,14 +32,25 @@ export default function SceneSettings({ isAdminNight }: { isAdminNight: boolean 
     const dayInputRef = useRef<HTMLInputElement>(null);
     const nightInputRef = useRef<HTMLInputElement>(null);
 
+    const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
     useEffect(() => {
+        let mounted = true;
         fetch('/api/site-settings')
-            .then(r => r.json())
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
             .then(data => {
-                if (data.settings) setSettings({ ...DEFAULTS, ...data.settings });
+                if (mounted && data.settings) setSettings({ ...DEFAULTS, ...data.settings });
             })
-            .catch(console.error)
-            .finally(() => setLoading(false));
+            .catch(err => { if (mounted) console.error('Fetch error:', err); })
+            .finally(() => { if (mounted) setLoading(false); });
+        return () => { mounted = false; };
+    }, []);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        };
     }, []);
 
     const handleSave = async () => {
@@ -52,7 +63,8 @@ export default function SceneSettings({ isAdminNight }: { isAdminNight: boolean 
             });
             if (res.ok) {
                 setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
+                if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+                savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
             }
         } catch (err) {
             console.error('Save error:', err);

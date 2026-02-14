@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface SEOSettingsData {
     seoTitle?: string;
@@ -13,12 +13,14 @@ export default function SEOSettings({ isAdminNight }: { isAdminNight: boolean })
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
+        let mounted = true;
         fetch('/api/site-settings')
-            .then(r => r.json())
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
             .then(data => {
-                if (data.settings) {
+                if (mounted && data.settings) {
                     setSettings({
                         seoTitle: data.settings.seoTitle || '',
                         seoDescription: data.settings.seoDescription || '',
@@ -26,8 +28,16 @@ export default function SEOSettings({ isAdminNight }: { isAdminNight: boolean })
                     });
                 }
             })
-            .catch(console.error)
-            .finally(() => setLoading(false));
+            .catch(err => { if (mounted) console.error('Fetch error:', err); })
+            .finally(() => { if (mounted) setLoading(false); });
+        return () => { mounted = false; };
+    }, []);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        };
     }, []);
 
     const handleSave = async () => {
@@ -40,7 +50,8 @@ export default function SEOSettings({ isAdminNight }: { isAdminNight: boolean })
             });
             if (res.ok) {
                 setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
+                if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+                savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
             }
         } catch (err) {
             console.error('Save error:', err);

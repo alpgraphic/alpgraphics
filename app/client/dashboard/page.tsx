@@ -39,12 +39,14 @@ export default function ClientDashboard() {
 
     // Fetch account data from API on mount
     useEffect(() => {
+        let mounted = true;
+
         const fetchAccount = async () => {
             try {
                 const res = await fetch('/api/client/me');
+                if (!mounted) return;
 
                 if (res.status === 401) {
-                    // Session expired or not logged in
                     localStorage.removeItem('client_session');
                     localStorage.removeItem('alpa_auth');
                     router.push('/login');
@@ -56,20 +58,24 @@ export default function ClientDashboard() {
                 }
 
                 const data = await res.json();
+                if (!mounted) return;
+
                 if (data.success && data.account) {
                     setAccount(data.account);
                 } else {
                     setLoadError(data.error || 'Hesap bulunamadı');
                 }
             } catch (error) {
+                if (!mounted) return;
                 console.error('Client dashboard fetch error:', error);
                 setLoadError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
             } finally {
-                setIsLoading(false);
+                if (mounted) setIsLoading(false);
             }
         };
 
         fetchAccount();
+        return () => { mounted = false; };
     }, [router]);
 
     const handleInputChange = (questionId: string, value: string | string[]) => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { getAccountsCollection, DbAccount } from '@/lib/mongodb';
+import { getAccountsCollection, getTransactionsCollection, getSessionsCollection, DbAccount } from '@/lib/mongodb';
 import { requireAdmin } from '@/lib/auth/session';
 import { generateBriefToken } from '@/lib/briefTypes';
 import { validatePassword } from '@/lib/security/password';
@@ -185,6 +185,14 @@ export async function DELETE(request: NextRequest) {
                 { status: 404 }
             );
         }
+
+        // Cascade: clean up related data
+        const transactions = await getTransactionsCollection();
+        const sessions = await getSessionsCollection();
+        await Promise.all([
+            transactions.deleteMany({ accountId: id }),
+            sessions.deleteMany({ userId: id }),
+        ]);
 
         return NextResponse.json({ success: true });
 

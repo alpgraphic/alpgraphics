@@ -18,11 +18,12 @@ import { cleanupExpiredRateLimits } from '@/lib/security/rateLimit';
  */
 export async function POST(request: NextRequest) {
     try {
-        // Verify cron secret
+        // Verify cron secret (required in production)
         const authHeader = request.headers.get('authorization');
         const cronSecret = process.env.CRON_SECRET;
 
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+        // Block if no CRON_SECRET configured or if token doesn't match
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             // Hash Password with higher cost factor for admin
             const passwordHash = await bcrypt.hash(password, 12);
 
-            // Create Admin
+            // Create Admin atomically to prevent race condition
             const newAdmin = {
                 email: email.toLowerCase(),
                 passwordHash,
@@ -96,7 +96,19 @@ export async function POST(request: NextRequest) {
                 updatedAt: new Date()
             };
 
-            await accounts.insertOne(newAdmin);
+            // Atomic: only insert if no admin exists (prevents two concurrent setups)
+            const result = await accounts.findOneAndUpdate(
+                { role: 'admin' },
+                { $setOnInsert: newAdmin },
+                { upsert: true, returnDocument: 'after' }
+            );
+
+            // If the returned doc has a different email, another admin was created first
+            if (result && result.email !== email.toLowerCase()) {
+                return NextResponse.json({
+                    error: 'Başka bir admin zaten oluşturulmuş.'
+                }, { status: 403 });
+            }
 
             return NextResponse.json({ success: true, message: 'Admin başarıyla oluşturuldu' });
         }

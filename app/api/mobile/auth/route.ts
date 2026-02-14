@@ -218,22 +218,54 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
 // PUT /api/mobile/auth - Refresh Token
 export async function PUT(request: NextRequest): Promise<NextResponse<TokenResponse>> {
     try {
-        const body = await request.json();
-        const { refreshToken } = body;
+        const ip = getClientIP(request);
 
-        if (!refreshToken) {
+        // Rate limiting for refresh attempts
+        const rateCheck = await checkRateLimit(ip, '/api/mobile/auth/refresh', 'auth');
+        if (!rateCheck.allowed) {
             return NextResponse.json(
-                { success: false, error: 'Refresh token gereklidir' },
-                { status: 400 }
+                { success: false, error: 'Çok fazla istek. Lütfen bekleyin.' },
+                { status: 429 }
             );
         }
 
+        // Verify refresh token from httpOnly cookie (not from request body)
+        const cookieStore = await cookies();
+        const storedRefreshToken = cookieStore.get('mobile_refresh_token')?.value;
+        const storedRole = cookieStore.get('mobile_role')?.value;
+
+        if (!storedRefreshToken) {
+            return NextResponse.json(
+                { success: false, error: 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' },
+                { status: 401 }
+            );
+        }
+
+        // Validate token format
+        if (storedRefreshToken.length < 32) {
+            return NextResponse.json(
+                { success: false, error: 'Geçersiz token. Lütfen tekrar giriş yapın.' },
+                { status: 401 }
+            );
+        }
+
+        // Generate new access token
         const newAccessToken = generateToken();
+
+        // Update access token cookie
+        cookieStore.set('mobile_access_token', newAccessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60,
+            path: '/',
+        });
 
         return NextResponse.json({
             success: true,
             accessToken: newAccessToken,
             expiresIn: 15 * 60,
+            role: storedRole || undefined,
         });
 
     } catch (error) {
