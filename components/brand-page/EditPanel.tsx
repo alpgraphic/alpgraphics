@@ -348,13 +348,27 @@ export default function EditPanel({
                             {/* Bold Playful */}
                             <button
                                 onClick={() => onUpdate({ template: 'bold-playful' })}
-                                className={`p-2 rounded-lg border text-left transition-all col-span-2 ${brandPage.template === 'bold-playful' ? 'border-[#a62932] bg-[#a62932]/10 ring-1 ring-[#a62932]' : 'border-current/10 hover:border-current/30'}`}
+                                className={`p-2 rounded-lg border text-left transition-all ${brandPage.template === 'bold-playful' ? 'border-[#a62932] bg-[#a62932]/10 ring-1 ring-[#a62932]' : 'border-current/10 hover:border-current/30'}`}
                             >
-                                <div className="aspect-[8/3] rounded bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 mb-2 flex items-center justify-center">
+                                <div className="aspect-[4/3] rounded bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 mb-2 flex items-center justify-center">
                                     <span className="text-[12px] text-white font-black tracking-tight">BOLD!</span>
                                 </div>
                                 <p className="text-[10px] font-bold">Bold Playful</p>
                                 <p className="text-[8px] opacity-40">Cesur, enerjik</p>
+                            </button>
+
+                            {/* Social Media */}
+                            <button
+                                onClick={() => onUpdate({ template: 'social-media' })}
+                                className={`p-2 rounded-lg border text-left transition-all ${brandPage.template === 'social-media' ? 'border-[#a62932] bg-[#a62932]/10 ring-1 ring-[#a62932]' : 'border-current/10 hover:border-current/30'}`}
+                            >
+                                <div className="aspect-[4/3] rounded bg-[#fafaf8] border border-black/10 mb-2 flex flex-col items-center justify-center gap-1">
+                                    <span className="text-[8px] text-[#1a1a1a]/40 tracking-[0.2em] uppercase">Strategy</span>
+                                    <span className="text-[11px] text-[#1a1a1a] font-light tracking-tight">Social Media</span>
+                                    <div className="w-6 h-px bg-[#1a1a1a]/15 mt-0.5" />
+                                </div>
+                                <p className="text-[10px] font-bold">Social Media</p>
+                                <p className="text-[8px] opacity-40">SM Sunumu</p>
                             </button>
                         </div>
                     </div>
@@ -467,18 +481,24 @@ export default function EditPanel({
                         onClick={() => toggleSection('logos')}
                         className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
                     >
-                        <span className="text-xs font-bold uppercase tracking-wider">🖼️ Logo Files & Sizes</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">🖼️ {brandPage.template === 'social-media' ? 'Logo & İkon' : 'Logo Files & Sizes'}</span>
                         <span className="text-lg opacity-40">{expandedSection === 'logos' ? '−' : '+'}</span>
                     </button>
 
                     {expandedSection === 'logos' && (
                         <div className="px-6 py-5 space-y-6 bg-black/[0.01]">
-                            {[
-                                { key: 'light', label: 'Logo Light (dark backgrounds)', sizeKey: 'logoLightSize' },
-                                { key: 'dark', label: 'Logo Dark (light backgrounds)', sizeKey: 'logoDarkSize' },
-                                { key: 'iconLight', label: 'Icon Light', sizeKey: 'iconLightSize' },
-                                { key: 'iconDark', label: 'Icon Dark', sizeKey: 'iconDarkSize' }
-                            ].map(({ key, label, sizeKey }) => (
+                            {(brandPage.template === 'social-media'
+                                ? [
+                                    { key: 'dark', label: 'Logo', sizeKey: 'logoDarkSize' },
+                                    { key: 'iconDark', label: 'İkon', sizeKey: 'iconDarkSize' }
+                                ]
+                                : [
+                                    { key: 'light', label: 'Logo Light (dark backgrounds)', sizeKey: 'logoLightSize' },
+                                    { key: 'dark', label: 'Logo Dark (light backgrounds)', sizeKey: 'logoDarkSize' },
+                                    { key: 'iconLight', label: 'Icon Light', sizeKey: 'iconLightSize' },
+                                    { key: 'iconDark', label: 'Icon Dark', sizeKey: 'iconDarkSize' }
+                                ]
+                            ).map(({ key, label, sizeKey }) => (
                                 <div key={key} className="space-y-3 pb-4 border-b border-current/5 last:border-0 last:pb-0">
                                     <label className="text-[10px] uppercase tracking-wider opacity-40 block">{label}</label>
 
@@ -492,29 +512,32 @@ export default function EditPanel({
 
                                     {brandPage.logos?.[key] && (
                                         <>
-                                            <div className="flex items-center gap-2 text-xs opacity-60">
-                                                <span className="text-green-500">✓</span>
-                                                <span>Uploaded</span>
+                                            <div className="relative group inline-block">
+                                                <img src={brandPage.logos[key]} alt={label} className="h-16 object-contain bg-current/5 rounded p-2" />
+                                                <button
+                                                    onClick={() => onUpdate({ logos: { ...brandPage.logos, [key]: '' } })}
+                                                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                                >×</button>
                                             </div>
 
-                                            {/* Size Slider */}
-                                            <div className="mt-3">
+                                            {/* Logo Size Slider */}
+                                            <div className="mt-2">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-[10px] uppercase tracking-wider opacity-40">Logo Size</span>
+                                                    <span className="text-[10px] uppercase tracking-wider opacity-40">Boyut</span>
                                                     <span className="text-xs font-mono opacity-60">
-                                                        {brandPage.sizeConfig?.[sizeKey as keyof typeof brandPage.sizeConfig] || 200}px
+                                                        {brandPage.heroConfig?.logoSize || 180}px
                                                     </span>
                                                 </div>
                                                 <input
                                                     type="range"
-                                                    min="100"
+                                                    min="40"
                                                     max="400"
                                                     step="10"
-                                                    value={brandPage.sizeConfig?.[sizeKey as keyof typeof brandPage.sizeConfig] || 200}
+                                                    value={brandPage.heroConfig?.logoSize || 180}
                                                     onChange={(e) => onUpdate({
-                                                        sizeConfig: {
-                                                            ...brandPage.sizeConfig,
-                                                            [sizeKey]: parseInt(e.target.value)
+                                                        heroConfig: {
+                                                            ...brandPage.heroConfig,
+                                                            logoSize: parseInt(e.target.value)
                                                         }
                                                     })}
                                                     className="w-full accent-[#a62932]"
@@ -528,8 +551,8 @@ export default function EditPanel({
                     )}
                 </div>
 
-                {/* FONTS */}
-                <div className="border-b border-current/5">
+                {/* FONTS - Hidden for social-media template */}
+                {brandPage.template !== 'social-media' && <div className="border-b border-current/5">
                     <button
                         onClick={() => toggleSection('fonts')}
                         className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
@@ -626,10 +649,10 @@ export default function EditPanel({
                             </div>
                         </div>
                     )}
-                </div>
+                </div>}
 
                 {/* COLORS */}
-                <div className="border-b border-current/5">
+                {brandPage.template !== 'social-media' && <div className="border-b border-current/5">
                     <button
                         onClick={() => toggleSection('colors')}
                         className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
@@ -707,7 +730,7 @@ export default function EditPanel({
                             </button>
                         </div>
                     )}
-                </div>
+                </div>}
 
                 {/* SECTIONS TOGGLE */}
                 <div className="border-b border-current/5">
@@ -881,6 +904,458 @@ export default function EditPanel({
                         </div>
                     )}
                 </div>
+
+                {/* SOCIAL MEDIA STRATEGY - Only visible for social-media template */}
+                {brandPage.template === 'social-media' && (
+                    <>
+                        {/* GOALS */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smGoals')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">🎯 Hedefler</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smGoals' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smGoals' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.goals || []).map((goal: any, idx: number) => (
+                                        <div key={idx} className="p-3 border border-current/10 rounded-lg space-y-2">
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="İkon (emoji)" value={goal.icon || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.goals || [])];
+                                                        updated[idx] = { ...goal, icon: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, goals: updated } });
+                                                    }}
+                                                    className="w-16 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none text-center" />
+                                                <input type="text" placeholder="Hedef başlığı" value={goal.title || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.goals || [])];
+                                                        updated[idx] = { ...goal, title: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, goals: updated } });
+                                                    }}
+                                                    className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <button onClick={() => {
+                                                    const updated = (brandPage.socialMediaStrategy?.goals || []).filter((_: any, i: number) => i !== idx);
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, goals: updated } });
+                                                }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                            </div>
+                                            <input type="text" placeholder="Açıklama" value={goal.description || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.goals || [])];
+                                                    updated[idx] = { ...goal, description: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, goals: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newGoal = { title: '', description: '', icon: '🎯' };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, goals: [...(brandPage.socialMediaStrategy?.goals || []), newGoal] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Hedef Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* CONTENT PILLARS */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smPillars')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">📚 İçerik Sütunları</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smPillars' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smPillars' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.contentPillars || []).map((pillar: any, idx: number) => (
+                                        <div key={idx} className="p-3 border border-current/10 rounded-lg space-y-2">
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="İkon" value={pillar.icon || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.contentPillars || [])];
+                                                        updated[idx] = { ...pillar, icon: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: updated } });
+                                                    }}
+                                                    className="w-16 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none text-center" />
+                                                <input type="text" placeholder="Sütun adı" value={pillar.title || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.contentPillars || [])];
+                                                        updated[idx] = { ...pillar, title: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: updated } });
+                                                    }}
+                                                    className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="color" value={pillar.color || '#6366f1'}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.contentPillars || [])];
+                                                        updated[idx] = { ...pillar, color: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: updated } });
+                                                    }}
+                                                    className="w-10 h-8 rounded cursor-pointer border border-current/10" />
+                                                <button onClick={() => {
+                                                    const updated = (brandPage.socialMediaStrategy?.contentPillars || []).filter((_: any, i: number) => i !== idx);
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: updated } });
+                                                }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                            </div>
+                                            <input type="text" placeholder="Açıklama" value={pillar.description || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.contentPillars || [])];
+                                                    updated[idx] = { ...pillar, description: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newPillar = { title: '', description: '', icon: '📌', color: '#6366f1' };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, contentPillars: [...(brandPage.socialMediaStrategy?.contentPillars || []), newPillar] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Sütun Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PLATFORM STRATEGY */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smPlatforms')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">📱 Platform Stratejisi</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smPlatforms' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smPlatforms' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.platformStrategy || []).map((plat: any, idx: number) => (
+                                        <div key={idx} className="p-3 border border-current/10 rounded-lg space-y-2">
+                                            <div className="flex gap-2 items-center">
+                                                <input type="text" placeholder="Platform" value={plat.platform || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.platformStrategy || [])];
+                                                        updated[idx] = { ...plat, platform: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: updated } });
+                                                    }}
+                                                    className="w-32 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="text" placeholder="Sıklık" value={plat.frequency || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.platformStrategy || [])];
+                                                        updated[idx] = { ...plat, frequency: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: updated } });
+                                                    }}
+                                                    className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <button onClick={() => {
+                                                    const updated = (brandPage.socialMediaStrategy?.platformStrategy || []).filter((_: any, i: number) => i !== idx);
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: updated } });
+                                                }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                            </div>
+                                            <input type="text" placeholder="Ton & Üslup" value={plat.tone || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.platformStrategy || [])];
+                                                    updated[idx] = { ...plat, tone: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            <input type="text" placeholder="İçerik türleri (virgülle ayırın)" value={(plat.contentTypes || []).join(', ')}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.platformStrategy || [])];
+                                                    updated[idx] = { ...plat, contentTypes: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newPlat = { platform: '', tone: '', frequency: '', contentTypes: [] };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, platformStrategy: [...(brandPage.socialMediaStrategy?.platformStrategy || []), newPlat] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Platform Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* HASHTAG STRATEGY */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smHashtags')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">#️⃣ Hashtag Stratejisi</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smHashtags' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smHashtags' && (
+                                <div className="px-6 py-5 space-y-5 bg-black/[0.01]">
+                                    {(['branded', 'industry', 'campaign'] as const).map((category) => {
+                                        const labels: Record<string, string> = { branded: '🏷️ Marka Hashtag\'leri', industry: '🏭 Sektör Hashtag\'leri', campaign: '🚀 Kampanya Hashtag\'leri' };
+                                        return (
+                                            <div key={category} className="space-y-2">
+                                                <label className="text-[10px] uppercase tracking-wider opacity-40 block">{labels[category]}</label>
+                                                <input type="text" placeholder="Virgülle ayırarak yazın (#tag1, #tag2)"
+                                                    value={(brandPage.socialMediaStrategy?.hashtagStrategy?.[category] || []).join(', ')}
+                                                    onChange={(e) => {
+                                                        const tags = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
+                                                        onUpdate({
+                                                            socialMediaStrategy: {
+                                                                ...brandPage.socialMediaStrategy,
+                                                                hashtagStrategy: { ...brandPage.socialMediaStrategy?.hashtagStrategy, [category]: tags }
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="w-full px-3 py-2 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* CONTENT CALENDAR */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smCalendar')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">📅 İçerik Takvimi</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smCalendar' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smCalendar' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.calendarData || []).map((item: any, idx: number) => (
+                                        <div key={idx} className="p-3 border border-current/10 rounded-lg space-y-2">
+                                            <div className="flex gap-2">
+                                                <select value={item.day || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, day: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="w-28 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none">
+                                                    <option value="Pazartesi">Pazartesi</option>
+                                                    <option value="Salı">Salı</option>
+                                                    <option value="Çarşamba">Çarşamba</option>
+                                                    <option value="Perşembe">Perşembe</option>
+                                                    <option value="Cuma">Cuma</option>
+                                                    <option value="Cumartesi">Cumartesi</option>
+                                                    <option value="Pazar">Pazar</option>
+                                                </select>
+                                                <input type="text" placeholder="Platform" value={item.platform || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, platform: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="w-28 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="time" value={item.time || '10:00'}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, time: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="color" value={item.color || '#6366f1'}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, color: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="w-10 h-8 rounded cursor-pointer border border-current/10" />
+                                                <button onClick={() => {
+                                                    const updated = (brandPage.socialMediaStrategy?.calendarData || []).filter((_: any, i: number) => i !== idx);
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="İçerik türü" value={item.contentType || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, contentType: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="w-32 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="text" placeholder="Açıklama" value={item.description || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.calendarData || [])];
+                                                        updated[idx] = { ...item, description: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: updated } });
+                                                    }}
+                                                    className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newItem = { day: 'Pazartesi', platform: 'Instagram', contentType: 'Post', description: '', time: '10:00', color: '#6366f1' };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, calendarData: [...(brandPage.socialMediaStrategy?.calendarData || []), newItem] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Takvim Öğesi Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* KPI METRICS */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smKpi')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">📊 KPI & Metrikler</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smKpi' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smKpi' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.kpiMetrics || []).map((kpi: any, idx: number) => (
+                                        <div key={idx} className="flex gap-2 items-center">
+                                            <input type="text" placeholder="İkon" value={kpi.icon || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.kpiMetrics || [])];
+                                                    updated[idx] = { ...kpi, icon: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, kpiMetrics: updated } });
+                                                }}
+                                                className="w-16 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none text-center" />
+                                            <input type="text" placeholder="Metrik adı" value={kpi.metric || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.kpiMetrics || [])];
+                                                    updated[idx] = { ...kpi, metric: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, kpiMetrics: updated } });
+                                                }}
+                                                className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            <input type="text" placeholder="Hedef" value={kpi.target || ''}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.kpiMetrics || [])];
+                                                    updated[idx] = { ...kpi, target: e.target.value };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, kpiMetrics: updated } });
+                                                }}
+                                                className="w-32 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            <button onClick={() => {
+                                                const updated = (brandPage.socialMediaStrategy?.kpiMetrics || []).filter((_: any, i: number) => i !== idx);
+                                                onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, kpiMetrics: updated } });
+                                            }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newKpi = { metric: '', target: '', icon: '📊' };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, kpiMetrics: [...(brandPage.socialMediaStrategy?.kpiMetrics || []), newKpi] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Metrik Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* TARGET AUDIENCE */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smAudience')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">👥 Hedef Kitle</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smAudience' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smAudience' && (
+                                <div className="px-6 py-5 space-y-4 bg-black/[0.01]">
+                                    {(brandPage.socialMediaStrategy?.targetAudience || []).map((persona: any, idx: number) => (
+                                        <div key={idx} className="p-3 border border-current/10 rounded-lg space-y-2">
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="Persona adı" value={persona.persona || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.targetAudience || [])];
+                                                        updated[idx] = { ...persona, persona: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: updated } });
+                                                    }}
+                                                    className="flex-1 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <input type="text" placeholder="Yaş aralığı" value={persona.age || ''}
+                                                    onChange={(e) => {
+                                                        const updated = [...(brandPage.socialMediaStrategy?.targetAudience || [])];
+                                                        updated[idx] = { ...persona, age: e.target.value };
+                                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: updated } });
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                                <button onClick={() => {
+                                                    const updated = (brandPage.socialMediaStrategy?.targetAudience || []).filter((_: any, i: number) => i !== idx);
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: updated } });
+                                                }} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold">×</button>
+                                            </div>
+                                            <input type="text" placeholder="İlgi alanları (virgülle ayırın)" value={(persona.interests || []).join(', ')}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.targetAudience || [])];
+                                                    updated[idx] = { ...persona, interests: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                            <input type="text" placeholder="Platformlar (virgülle ayırın)" value={(persona.platforms || []).join(', ')}
+                                                onChange={(e) => {
+                                                    const updated = [...(brandPage.socialMediaStrategy?.targetAudience || [])];
+                                                    updated[idx] = { ...persona, platforms: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) };
+                                                    onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: updated } });
+                                                }}
+                                                className="w-full px-2 py-1.5 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newPersona = { persona: '', age: '', interests: [], platforms: [] };
+                                        onUpdate({ socialMediaStrategy: { ...brandPage.socialMediaStrategy, targetAudience: [...(brandPage.socialMediaStrategy?.targetAudience || []), newPersona] } });
+                                    }} className="w-full px-4 py-2.5 border-2 border-dashed border-current/20 rounded-lg text-sm font-bold opacity-60 hover:opacity-100 transition-all">+ Persona Ekle</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* BRAND VOICE */}
+                        <div className="border-b border-current/5">
+                            <button
+                                onClick={() => toggleSection('smVoice')}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-current/5 transition-colors text-left"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider">🗣️ Marka Sesi</span>
+                                <span className="text-lg opacity-40">{expandedSection === 'smVoice' ? '−' : '+'}</span>
+                            </button>
+                            {expandedSection === 'smVoice' && (
+                                <div className="px-6 py-5 space-y-5 bg-black/[0.01]">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase tracking-wider opacity-40 block">Ses Tonu (virgülle ayırın)</label>
+                                        <input type="text" placeholder="Samimi, Profesyonel, İlham Verici"
+                                            value={(brandPage.socialMediaStrategy?.brandVoice?.tone || []).join(', ')}
+                                            onChange={(e) => {
+                                                const tones = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
+                                                onUpdate({
+                                                    socialMediaStrategy: {
+                                                        ...brandPage.socialMediaStrategy,
+                                                        brandVoice: { ...brandPage.socialMediaStrategy?.brandVoice, tone: tones }
+                                                    }
+                                                });
+                                            }}
+                                            className="w-full px-3 py-2 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase tracking-wider opacity-40 block">✅ Yapılacaklar (virgülle ayırın)</label>
+                                        <textarea placeholder="Her satıra bir madde yazın"
+                                            value={(brandPage.socialMediaStrategy?.brandVoice?.doList || []).join('\n')}
+                                            onChange={(e) => {
+                                                const items = e.target.value.split('\n').filter(Boolean);
+                                                onUpdate({
+                                                    socialMediaStrategy: {
+                                                        ...brandPage.socialMediaStrategy,
+                                                        brandVoice: { ...brandPage.socialMediaStrategy?.brandVoice, doList: items }
+                                                    }
+                                                });
+                                            }}
+                                            rows={4}
+                                            className="w-full px-3 py-2 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none resize-none" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase tracking-wider opacity-40 block">❌ Kaçınılacaklar (her satıra bir madde)</label>
+                                        <textarea placeholder="Her satıra bir madde yazın"
+                                            value={(brandPage.socialMediaStrategy?.brandVoice?.dontList || []).join('\n')}
+                                            onChange={(e) => {
+                                                const items = e.target.value.split('\n').filter(Boolean);
+                                                onUpdate({
+                                                    socialMediaStrategy: {
+                                                        ...brandPage.socialMediaStrategy,
+                                                        brandVoice: { ...brandPage.socialMediaStrategy?.brandVoice, dontList: items }
+                                                    }
+                                                });
+                                            }}
+                                            rows={4}
+                                            className="w-full px-3 py-2 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none resize-none" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
 
                 {/* TEXT OVERRIDES - ALL SECTION TEXTS */}
                 <div className="border-b border-current/5">

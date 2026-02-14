@@ -6,6 +6,7 @@ import MinimalClean from "./templates/MinimalClean";
 import TechModern from "./templates/TechModern";
 import OrganicNatural from "./templates/OrganicNatural";
 import BoldPlayful from "./templates/BoldPlayful";
+import SocialMediaPresentation from "./templates/SocialMediaPresentation";
 import { BrandPage } from "@/lib/brandPageTypes";
 
 interface LivePreviewProps {
@@ -18,6 +19,7 @@ const templateComponents = {
     'tech-modern': TechModern,
     'organic-natural': OrganicNatural,
     'bold-playful': BoldPlayful,
+    'social-media': SocialMediaPresentation,
 };
 
 export default function LivePreview({ brandPage }: LivePreviewProps) {
@@ -75,6 +77,7 @@ export default function LivePreview({ brandPage }: LivePreviewProps) {
         'tech-modern': 'bg-[#0a0a0a]',
         'organic-natural': 'bg-[#f5f2ed]',
         'bold-playful': 'bg-white',
+        'social-media': 'bg-[#fafaf8]',
     };
 
     return (

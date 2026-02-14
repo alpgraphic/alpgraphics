@@ -28,7 +28,6 @@ export async function GET() {
         const projects = await collection.find(filter, {
             projection: {
                 pageBlocks: 0,
-                brandData: 0,
                 brandGuide: 0,
                 projectAssets: 0,
                 tasks: 0,

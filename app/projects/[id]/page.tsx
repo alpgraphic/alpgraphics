@@ -11,15 +11,19 @@ import MinimalClean from "@/components/brand-page/templates/MinimalClean";
 import BoldPlayful from "@/components/brand-page/templates/BoldPlayful";
 import TechModern from "@/components/brand-page/templates/TechModern";
 import OrganicNatural from "@/components/brand-page/templates/OrganicNatural";
+import SocialMediaPresentation from "@/components/brand-page/templates/SocialMediaPresentation";
 
 // Template renderer based on brandData.template
+// Admin panel saves kebab-case template names (e.g. 'editorial-luxury')
 function BrandPageRenderer({ brandData }: { brandData: any }) {
-    const template = brandData.template || 'EditorialLuxury';
+    const template = brandData.template || 'editorial-luxury';
     switch (template) {
-        case 'MinimalClean': return <MinimalClean brandPage={brandData} />;
-        case 'BoldPlayful': return <BoldPlayful brandPage={brandData} />;
-        case 'TechModern': return <TechModern brandPage={brandData} />;
-        case 'OrganicNatural': return <OrganicNatural brandPage={brandData} />;
+        case 'minimal-clean': return <MinimalClean brandPage={brandData} />;
+        case 'bold-playful': return <BoldPlayful brandPage={brandData} />;
+        case 'tech-modern': return <TechModern brandPage={brandData} />;
+        case 'organic-natural': return <OrganicNatural brandPage={brandData} />;
+        case 'social-media': return <SocialMediaPresentation brandPage={brandData} />;
+        case 'editorial-luxury':
         default: return <EditorialLuxury brandPage={brandData} />;
     }
 }

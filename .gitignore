@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Diagnostic scripts
+check-db.js
+check-sessions.js
+clean-sessions.js
+delete-mocks.js
+list-projects.js
+
+# Old reference files
+eski-dosyalar/

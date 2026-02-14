@@ -58,7 +58,7 @@ export interface BrandPage {
     colors: ColorPalette;
     mockups: MockupImage[];
     sections: SectionConfig[];
-    template: 'editorial-luxury' | 'minimal-clean' | 'tech-modern' | 'organic-natural' | 'bold-playful';
+    template: 'editorial-luxury' | 'minimal-clean' | 'tech-modern' | 'organic-natural' | 'bold-playful' | 'social-media';
     heroConfig?: {
         categoryLabel?: string;  // "Brand Identity", "Logo Guidelines", etc.
         categoryLabelColor?: string;  // Custom color for category label
@@ -95,6 +95,34 @@ export interface BrandPage {
         headingFontSize?: number;  // 40-120px
         bodyFontSize?: number;  // 14-32px
     };
+    // Social Media Presentation specific fields
+    socialMediaStrategy?: {
+        goals?: Array<{ title: string; description: string; icon?: string }>;
+        contentPillars?: Array<{ title: string; description: string; color?: string; icon?: string; image?: string }>;
+        platformStrategy?: Array<{ platform: string; tone: string; frequency: string; contentTypes: string[]; icon?: string }>;
+        hashtagStrategy?: {
+            branded?: string[];
+            industry?: string[];
+            campaign?: string[];
+        };
+        calendarData?: Array<{
+            day: string;
+            platform: string;
+            contentType: string;
+            description: string;
+            time?: string;
+            color?: string;
+        }>;
+        kpiMetrics?: Array<{ metric: string; target: string; icon?: string }>;
+        targetAudience?: Array<{ persona: string; age: string; interests: string[]; platforms: string[] }>;
+        brandVoice?: {
+            tone?: string[];
+            doList?: string[];
+            dontList?: string[];
+        };
+        mockupGridCols?: number;
+    };
+
     aiDecisions?: {
         heroBackground: string;
         logoSize: string;

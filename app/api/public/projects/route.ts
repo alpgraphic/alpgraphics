@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProjectsCollection } from '@/lib/mongodb';
 
-// Public fields only - no sensitive data
+// Public fields only - lightweight for list view (no heavy brandData)
 const PUBLIC_FIELDS = {
     _id: 1,
     id: 1,
@@ -13,8 +13,8 @@ const PUBLIC_FIELDS = {
     description: 1,
     status: 1,
     isPagePublished: 1,
-    brandData: 1,
     linkedBrandPageId: 1,
+    // brandData loaded per-project via /api/public/projects/[id]
 };
 
 // GET - List published projects (NO AUTH REQUIRED)

@@ -83,7 +83,44 @@ export default function AdminDashboard() {
 
 
 
+    // Sync State
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState<string | null>(null);
 
+    const handleSyncToDB = async () => {
+        setIsSyncing(true);
+        setSyncResult(null);
+        try {
+            // Get projects from localStorage
+            const saved = localStorage.getItem('agency_data_v4');
+            const data = saved ? JSON.parse(saved) : {};
+            const localProjects = data.projects || projects;
+
+            if (localProjects.length === 0) {
+                setSyncResult('Senkronize edilecek proje bulunamadı');
+                return;
+            }
+
+            const res = await fetch('/api/admin/sync-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projects: localProjects })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                setSyncResult(`✅ ${result.synced} proje senkronize edildi (${result.skipped} atlandı)`);
+            } else {
+                const err = await res.json();
+                setSyncResult(`❌ Hata: ${err.error}`);
+            }
+        } catch (error) {
+            console.error('Sync error:', error);
+            setSyncResult('❌ Bağlantı hatası');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const handleCreateProject = (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,7 +153,7 @@ export default function AdminDashboard() {
             client: "",
             category: "Brand Page",
             year: "2026",
-            image: "/projects/p1.png",
+            image: "",
             description: "New brand page draft",
             status: 'Planning',
             progress: 0,
@@ -512,7 +549,9 @@ export default function AdminDashboard() {
                                     >
                                         {/* Background Image */}
                                         <img
-                                            src={project.image}
+                                            src={project.category === 'Brand Page' && project.brandData?.logos?.light
+                                                ? project.brandData.logos.light
+                                                : project.image}
                                             alt={project.title}
                                             className="absolute inset-0 w-full h-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
                                             onError={(e) => {
@@ -1979,6 +2018,31 @@ export default function AdminDashboard() {
                             exit={{ opacity: 0, y: -20 }}
                             className="space-y-12"
                         >
+                            {/* DB Sync Section */}
+                            <section className={`p-6 rounded-xl border ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/5'}`}>
+                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                    🔄 Veritabanı Senkronizasyonu
+                                </h3>
+                                <p className="text-sm opacity-60 mb-4">
+                                    LocalStorage&apos;daki projeleri veritabanına senkronize et. Work sayfasında ve brand page görüntülemelerinde veritabanındaki veriler kullanılır.
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={handleSyncToDB}
+                                        disabled={isSyncing}
+                                        className={`px-6 py-3 text-sm font-bold uppercase tracking-wider rounded-lg transition-colors ${isSyncing
+                                                ? 'bg-gray-500 text-gray-300 cursor-wait'
+                                                : 'bg-[#a62932] text-white hover:bg-[#c4323d]'
+                                            }`}
+                                    >
+                                        {isSyncing ? '⏳ Senkronize Ediliyor...' : '🔄 DB\'ye Senkronize Et'}
+                                    </button>
+                                    {syncResult && (
+                                        <span className="text-sm font-medium">{syncResult}</span>
+                                    )}
+                                </div>
+                            </section>
+
                             {/* Completed Section */}
                             <section>
                                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">

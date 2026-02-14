@@ -380,7 +380,18 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     // Initial Load
     useEffect(() => {
         setMounted(true);
-        const saved = localStorage.getItem('agency_data_v4');
+        let saved = localStorage.getItem('agency_data_v4');
+
+        // Migration: If v4 is missing but v3 exists, migrate it
+        if (!saved) {
+            const v3Data = localStorage.getItem('agency_data_v3');
+            if (v3Data) {
+                console.log("Migrating agency_data_v3 to v4...");
+                localStorage.setItem('agency_data_v4', v3Data);
+                saved = v3Data;
+            }
+        }
+
         if (saved) {
             try {
                 const data = JSON.parse(saved);
@@ -404,6 +415,16 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    // --- SESSION EXPIRY HANDLER ---
+    const handleSessionExpired = () => {
+        console.warn('Session expired — redirecting to login');
+        localStorage.removeItem('alpa_auth');
+        localStorage.removeItem('client_session');
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+            window.location.href = '/login';
+        }
+    };
+
     // --- PROJECTS (API INTEGRATED) ---
     // Fetch projects on load
     useEffect(() => {
@@ -412,17 +433,49 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         const fetchProjects = async () => {
             try {
                 const res = await fetch('/api/projects');
+                if (res.status === 401) {
+                    handleSessionExpired();
+                    return;
+                }
                 if (res.ok) {
                     const data = await res.json();
                     if (data.projects) {
-                        // Always include demo project
-                        const demoProject = INITIAL_PROJECTS.find(p => p.id === 'demo-alpgraphics');
-                        const hasDemo = data.projects.some((p: any) => p.id === 'demo-alpgraphics');
-                        if (demoProject && !hasDemo) {
-                            setProjects([demoProject, ...data.projects]);
-                        } else {
-                            setProjects(data.projects);
-                        }
+                        setProjects(prevLocal => {
+                            // Build a lookup of local projects by ID for fast access
+                            const localMap = new Map(prevLocal.map(p => [String(p.id), p]));
+
+                            // Merge API projects with local data:
+                            // API projects take priority, BUT preserve local-only fields
+                            // (brandData, pageBlocks etc.) that API may exclude via projection
+                            const mergedApiProjects = data.projects.map((apiProject: any) => {
+                                const localProject = localMap.get(String(apiProject.id));
+                                if (localProject) {
+                                    // Preserve local brandData/pageBlocks if API doesn't have them
+                                    return {
+                                        ...localProject,  // local data as base
+                                        ...apiProject,     // API data overrides
+                                        // But keep local brandData if API excluded it
+                                        brandData: apiProject.brandData || localProject.brandData,
+                                        pageBlocks: apiProject.pageBlocks || localProject.pageBlocks,
+                                    };
+                                }
+                                return apiProject;
+                            });
+
+                            // Add local-only projects (drafts not yet in DB)
+                            const apiIds = new Set(data.projects.map((p: any) => String(p.id)));
+                            const uniqueLocal = prevLocal.filter(p => !apiIds.has(String(p.id)));
+
+                            // Re-include demo project if it was missing
+                            const demoProject = INITIAL_PROJECTS.find(p => p.id === 'demo-alpgraphics');
+                            const hasDemo = mergedApiProjects.some((p: any) => p.id === 'demo-alpgraphics') ||
+                                uniqueLocal.some((p: any) => p.id === 'demo-alpgraphics');
+
+                            const merged = [...mergedApiProjects, ...uniqueLocal];
+                            if (demoProject && !hasDemo) merged.unshift(demoProject);
+
+                            return merged;
+                        });
                     }
                 }
             } catch (error) {
@@ -575,14 +628,31 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         const fetchAccounts = async () => {
             try {
                 const res = await fetch('/api/accounts');
+                if (res.status === 401) {
+                    handleSessionExpired();
+                    return;
+                }
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.accounts) {
+                    if (data.accounts && data.accounts.length > 0) {
                         setAccounts(data.accounts);
+                        // Persist to localStorage so accounts survive API failures
+                        try {
+                            const currentData = localStorage.getItem('agency_data_v4');
+                            const stored = currentData ? JSON.parse(currentData) : {};
+                            stored.accounts = data.accounts;
+                            localStorage.setItem('agency_data_v4', JSON.stringify(stored));
+                        } catch (e) {
+                            console.error('Failed to cache accounts:', e);
+                        }
                     }
+                } else {
+                    // API failed (non-401) — keep localStorage accounts if loaded
+                    console.warn('Accounts API returned', res.status, '— using cached data');
                 }
             } catch (error) {
                 console.error("Failed to fetch accounts:", error);
+                // Network error — localStorage accounts already loaded in initial useEffect
             }
         };
 

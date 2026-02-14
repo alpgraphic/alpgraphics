@@ -36,6 +36,35 @@ export default function BrandPageEdit() {
     const router = useRouter();
     const { projects, updateProject } = useAgency();
     const { showToast } = useToast();
+    const [apiBrandData, setApiBrandData] = useState<BrandPage | null>(null);
+
+    // Fetch full project from API if brandData is missing from context
+    useEffect(() => {
+        const urlId = params.id as string;
+        const projectId = isNaN(parseInt(urlId)) ? urlId : parseInt(urlId);
+        const project = projects.find(p => String(p.id) === String(projectId));
+
+        // If project exists but has no brandData, try fetching from API
+        if (project && !project.brandData) {
+            const fetchFullProject = async () => {
+                try {
+                    const res = await fetch(`/api/projects/${urlId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.project?.brandData) {
+                            setApiBrandData({
+                                ...data.project.brandData,
+                                id: String(data.project.id || data.project._id),
+                            } as BrandPage);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch project from API:', error);
+                }
+            };
+            fetchFullProject();
+        }
+    }, [params.id, projects]);
 
     // Initialize brand page from ID - load from context or fallback to demo
     const initialBrandPage = useMemo(() => {
@@ -44,7 +73,7 @@ export default function BrandPageEdit() {
         const projectId = isNaN(parseInt(urlId)) ? urlId : parseInt(urlId);
         const project = projects.find(p => String(p.id) === String(projectId));
 
-        // Priority 1: Full Brand Data Persistence
+        // Priority 1: Full Brand Data Persistence from context
         if (project && project.brandData) {
             return {
                 ...project.brandData,
@@ -52,7 +81,12 @@ export default function BrandPageEdit() {
             } as BrandPage;
         }
 
-        // Priority 2: Legacy/Partial Page Blocks
+        // Priority 2: Brand Data fetched from API
+        if (apiBrandData) {
+            return apiBrandData;
+        }
+
+        // Priority 3: Legacy/Partial Page Blocks
         if (project && project.pageBlocks && project.pageBlocks.length > 0) {
             // Map project to BrandPage format (using spread to maintain compatibility)
             return {
@@ -73,18 +107,39 @@ export default function BrandPageEdit() {
             id: safeId,
             brandName: project ? project.title : "New Brand Page"
         } as BrandPage;
-    }, [params.id, projects]);
+    }, [params.id, projects, apiBrandData]);
 
     const [brandPage, setBrandPage] = useState<BrandPage>(initialBrandPage);
+    const [hasUserEdited, setHasUserEdited] = useState(false);
 
-    // Fix: Sync state when projects are loaded from API to prevent stale empty data
+    // Only sync from context/API when we get RICHER data than what we have,
+    // and the user hasn't started editing yet. This prevents logo uploads
+    // and size changes from being silently discarded.
     useEffect(() => {
-        setBrandPage(initialBrandPage);
-    }, [initialBrandPage]);
+        if (!hasUserEdited) {
+            // Safe to overwrite — user hasn't touched anything yet
+            setBrandPage(initialBrandPage);
+        } else {
+            // User has edited — only merge in new fields that are missing locally
+            // (e.g., API returned brandData.logos but user hasn't uploaded logos yet)
+            setBrandPage(prev => {
+                // If context/API now has logos but we don't, take them
+                const mergedLogos = {
+                    ...(initialBrandPage.logos || {}),
+                    ...(prev.logos || {}), // User edits take priority
+                };
+                return {
+                    ...prev,
+                    logos: mergedLogos,
+                };
+            });
+        }
+    }, [initialBrandPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [isSaving, setIsSaving] = useState(false);
 
     const handleUpdate = (updates: Partial<BrandPage>) => {
+        setHasUserEdited(true);
         setBrandPage(prev => ({
             ...prev,
             ...updates,
