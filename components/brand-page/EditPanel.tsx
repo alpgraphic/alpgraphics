@@ -370,6 +370,20 @@ export default function EditPanel({
                                 <p className="text-[10px] font-bold">Social Media</p>
                                 <p className="text-[8px] opacity-40">SM Sunumu</p>
                             </button>
+
+                            {/* Corporate Identity */}
+                            <button
+                                onClick={() => onUpdate({ template: 'corporate-identity' })}
+                                className={`p-2 rounded-lg border text-left transition-all ${brandPage.template === 'corporate-identity' ? 'border-[#a62932] bg-[#a62932]/10 ring-1 ring-[#a62932]' : 'border-current/10 hover:border-current/30'}`}
+                            >
+                                <div className="aspect-[4/3] rounded bg-[#fafaf8] border border-black/10 mb-2 flex flex-col items-center justify-center gap-1">
+                                    <span className="text-[8px] text-[#1a1a1a]/40 tracking-[0.2em] uppercase">Identity</span>
+                                    <span className="text-[11px] text-[#1a1a1a] font-light tracking-tight">Kurumsal</span>
+                                    <div className="w-6 h-px bg-[#1a1a1a]/15 mt-0.5" />
+                                </div>
+                                <p className="text-[10px] font-bold">Kurumsal Kimlik</p>
+                                <p className="text-[8px] opacity-40">Editorial, temiz</p>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -471,6 +485,39 @@ export default function EditPanel({
                                     className="w-full px-3 py-2 text-sm bg-transparent border border-current/10 rounded-lg focus:border-current focus:outline-none"
                                 />
                             </div>
+
+                            {/* Hero Text Color (Year, Copyright, Scroll) */}
+                            <div>
+                                <label className="text-[10px] uppercase tracking-wider opacity-40 mb-2 block">Hero Text Color</label>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="color"
+                                        value={brandPage.heroConfig?.heroTextColor || '#000000'}
+                                        onChange={(e) => onUpdate({
+                                            heroConfig: {
+                                                ...brandPage.heroConfig,
+                                                heroTextColor: e.target.value
+                                            }
+                                        })}
+                                        title="Hero Text Color"
+                                        className="w-12 h-10 rounded-lg cursor-pointer border border-current/10"
+                                    />
+                                    <span className="text-xs opacity-50">Year, copyright, scroll text</span>
+                                    {brandPage.heroConfig?.heroTextColor && (
+                                        <button
+                                            onClick={() => onUpdate({
+                                                heroConfig: {
+                                                    ...brandPage.heroConfig,
+                                                    heroTextColor: undefined
+                                                }
+                                            })}
+                                            className="text-xs opacity-40 hover:opacity-100 underline"
+                                        >
+                                            Reset
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -520,12 +567,12 @@ export default function EditPanel({
                                                 >×</button>
                                             </div>
 
-                                            {/* Logo Size Slider */}
+                                            {/* Logo Size Slider - uses sizeConfig per logo variant */}
                                             <div className="mt-2">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-[10px] uppercase tracking-wider opacity-40">Boyut</span>
                                                     <span className="text-xs font-mono opacity-60">
-                                                        {brandPage.heroConfig?.logoSize || 180}px
+                                                        {(brandPage.sizeConfig as any)?.[sizeKey] || 180}px
                                                     </span>
                                                 </div>
                                                 <input
@@ -533,11 +580,11 @@ export default function EditPanel({
                                                     min="40"
                                                     max="400"
                                                     step="10"
-                                                    value={brandPage.heroConfig?.logoSize || 180}
+                                                    value={(brandPage.sizeConfig as any)?.[sizeKey] || 180}
                                                     onChange={(e) => onUpdate({
-                                                        heroConfig: {
-                                                            ...brandPage.heroConfig,
-                                                            logoSize: parseInt(e.target.value)
+                                                        sizeConfig: {
+                                                            ...brandPage.sizeConfig,
+                                                            [sizeKey]: parseInt(e.target.value)
                                                         }
                                                     })}
                                                     className="w-full accent-[#a62932]"

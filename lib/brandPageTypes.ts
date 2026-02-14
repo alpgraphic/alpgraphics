@@ -58,13 +58,14 @@ export interface BrandPage {
     colors: ColorPalette;
     mockups: MockupImage[];
     sections: SectionConfig[];
-    template: 'editorial-luxury' | 'minimal-clean' | 'tech-modern' | 'organic-natural' | 'bold-playful' | 'social-media';
+    template: 'editorial-luxury' | 'minimal-clean' | 'tech-modern' | 'organic-natural' | 'bold-playful' | 'social-media' | 'corporate-identity';
     heroConfig?: {
         categoryLabel?: string;  // "Brand Identity", "Logo Guidelines", etc.
         categoryLabelColor?: string;  // Custom color for category label
         copyrightText?: string;
         year?: string;
         logoSize?: number;  // 200-600px
+        heroTextColor?: string;  // Color for year, copyright, scroll indicator text
     };
     textOverrides?: {
         // Logo Showcase Section

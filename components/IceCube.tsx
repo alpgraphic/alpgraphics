@@ -61,6 +61,11 @@ export default function IceCube({ isNight }: { isNight: boolean }) {
     // Material ref for the front face (emissive)
     const emissiveMatRef = useRef<THREE.MeshStandardMaterial>(null);
 
+    // Pre-allocate reusable objects to avoid GC pressure (60 allocations/sec -> 0)
+    const idlePos = useMemo(() => new THREE.Vector3(0, 0, 5), []);
+    const colorOn = useMemo(() => new THREE.Color("#ffffcc"), []);
+    const colorOff = useMemo(() => new THREE.Color("#1a1a1a"), []);
+
     useFrame((state, delta) => {
         if (!meshRef.current || !lightRef.current) return;
 
@@ -82,9 +87,8 @@ export default function IceCube({ isNight }: { isNight: boolean }) {
             targetFound = true;
         }
 
-        // 2. Idle Logic (Target the floor design center)
+        // 2. Idle Logic (Target the floor design center - reuse pre-allocated vector)
         if (!targetFound) {
-            const idlePos = new THREE.Vector3(0, 0, 5);
             currentTargetPos.lerp(idlePos, 1.5 * delta);
             activeTargetId.current = null;
         }
@@ -130,9 +134,8 @@ export default function IceCube({ isNight }: { isNight: boolean }) {
                 fadeSpeed
             );
 
-            // 2. Lerp Color (Match body #1a1a1a when off, #ffffcc when on)
-            const targetColor = new THREE.Color(isNight ? "#ffffcc" : "#1a1a1a");
-            emissiveMatRef.current.color.lerp(targetColor, fadeSpeed);
+            // 2. Lerp Color (Match body #1a1a1a when off, #ffffcc when on) - reuse pre-allocated colors
+            emissiveMatRef.current.color.lerp(isNight ? colorOn : colorOff, fadeSpeed);
         }
     });
 

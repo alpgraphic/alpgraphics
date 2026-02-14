@@ -215,7 +215,7 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                         src={logos.light}
                                         alt="On Primary"
                                         className="object-contain"
-                                        style={{ maxWidth: `${logoLightSize * 0.6}px`, maxHeight: `${logoLightSize * 0.6}px` }}
+                                        style={{ maxWidth: `${logoLightSize}px`, maxHeight: `${logoLightSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-2xl font-black text-white" style={headingFontStyle}>{brandName}</span>
@@ -236,7 +236,7 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                         src={logos.dark}
                                         alt="On Secondary"
                                         className="object-contain"
-                                        style={{ maxWidth: `${logoDarkSize * 0.6}px`, maxHeight: `${logoDarkSize * 0.6}px` }}
+                                        style={{ maxWidth: `${logoDarkSize}px`, maxHeight: `${logoDarkSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-2xl font-black" style={headingFontStyle}>{brandName}</span>
@@ -256,7 +256,7 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                         src={logos.iconLight}
                                         alt="Icon Light"
                                         className="object-contain"
-                                        style={{ maxWidth: `${iconLightSize * 0.6}px`, maxHeight: `${iconLightSize * 0.6}px` }}
+                                        style={{ maxWidth: `${iconLightSize}px`, maxHeight: `${iconLightSize}px` }}
                                     />
                                 </motion.div>
                             )}
@@ -273,7 +273,7 @@ export default function BoldPlayful({ brandPage }: BoldPlayfulProps) {
                                         src={logos.iconDark}
                                         alt="Icon Dark"
                                         className="object-contain"
-                                        style={{ maxWidth: `${iconDarkSize * 0.6}px`, maxHeight: `${iconDarkSize * 0.6}px` }}
+                                        style={{ maxWidth: `${iconDarkSize}px`, maxHeight: `${iconDarkSize}px` }}
                                     />
                                 </motion.div>
                             )}

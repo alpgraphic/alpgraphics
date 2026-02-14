@@ -31,7 +31,7 @@ export default function TechModern({ brandPage }: TechModernProps) {
     const logoDarkSize = brandPage.sizeConfig?.logoDarkSize || 200;
     const iconLightSize = brandPage.sizeConfig?.iconLightSize || 180;
     const iconDarkSize = brandPage.sizeConfig?.iconDarkSize || 180;
-    const heroLogoSize = brandPage.heroConfig?.logoSize || 350;
+    const heroLogoSize = brandPage.heroConfig?.logoSize || 400;
     const headingFontSize = brandPage.sizeConfig?.headingFontSize || 72;
     const bodyFontSize = brandPage.sizeConfig?.bodyFontSize || 18;
 
@@ -187,7 +187,7 @@ export default function TechModern({ brandPage }: TechModernProps) {
                                         src={logos.light}
                                         alt="Primary"
                                         className="object-contain relative z-10"
-                                        style={{ maxWidth: `${logoLightSize}px`, maxHeight: `${logoLightSize * 0.5}px` }}
+                                        style={{ maxWidth: `${logoLightSize}px`, maxHeight: `${logoLightSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-3xl font-light relative z-10" style={headingFontStyle}>{brandName}</span>
@@ -208,7 +208,7 @@ export default function TechModern({ brandPage }: TechModernProps) {
                                         src={logos.dark}
                                         alt="Inverted"
                                         className="object-contain"
-                                        style={{ maxWidth: `${logoDarkSize}px`, maxHeight: `${logoDarkSize * 0.5}px` }}
+                                        style={{ maxWidth: `${logoDarkSize}px`, maxHeight: `${logoDarkSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-3xl font-light text-black" style={headingFontStyle}>{brandName}</span>

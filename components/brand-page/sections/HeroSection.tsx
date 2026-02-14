@@ -11,6 +11,7 @@ interface HeroSectionProps {
     background: string;
     logoSize?: number;  // User-adjustable: 200-600px
     isNight?: boolean;
+    heroTextColor?: string;  // Color for year, copyright, scroll indicator
 }
 
 export default function HeroSection({
@@ -21,8 +22,12 @@ export default function HeroSection({
     year = new Date().getFullYear().toString(),
     background,
     logoSize = 400,
-    isNight = false
+    isNight = false,
+    heroTextColor
 }: HeroSectionProps) {
+    // Default to black for readability on light backgrounds
+    const textColor = heroTextColor || (isNight ? '#ffffff' : '#000000');
+
     return (
         <motion.section
             initial={{ opacity: 0 }}
@@ -62,7 +67,7 @@ export default function HeroSection({
                     <p
                         className="text-xs md:text-sm font-bold uppercase tracking-[0.3em]"
                         style={{
-                            color: categoryLabelColor || (isNight ? '#f5f3e9' : '#1a1a1a'),
+                            color: categoryLabelColor || textColor,
                             opacity: categoryLabelColor ? 1 : 0.7
                         }}
                     >
@@ -78,7 +83,7 @@ export default function HeroSection({
                 transition={{ duration: 0.8, delay: 0.8 }}
                 className="absolute bottom-12 left-8 md:left-20"
             >
-                <p className="text-xs font-mono opacity-30">
+                <p className="text-xs font-mono" style={{ color: textColor, opacity: 0.4 }}>
                     {copyrightText}
                 </p>
             </motion.div>
@@ -90,7 +95,7 @@ export default function HeroSection({
                 transition={{ duration: 0.8, delay: 0.8 }}
                 className="absolute bottom-12 right-8 md:right-20"
             >
-                <p className="text-xs font-mono opacity-30">
+                <p className="text-xs font-mono" style={{ color: textColor, opacity: 0.4 }}>
                     {year}
                 </p>
             </motion.div>
@@ -102,7 +107,7 @@ export default function HeroSection({
                 transition={{ duration: 1, delay: 1.2 }}
                 className="absolute bottom-12 left-1/2 -translate-x-1/2"
             >
-                <div className="flex flex-col items-center gap-2 opacity-20">
+                <div className="flex flex-col items-center gap-2" style={{ color: textColor, opacity: 0.25 }}>
                     <span className="text-[8px] uppercase tracking-[0.3em] font-mono">Scroll</span>
                     <motion.div
                         animate={{ y: [0, 6, 0] }}
