@@ -119,10 +119,10 @@ function ResponsiveScene({ isNight, config }: { isNight: boolean; config: SceneC
     const dayPlaneRef = React.useRef<THREE.Mesh>(null);
     const nightPlaneRef = React.useRef<THREE.Mesh>(null);
     const floorMaterialRef = React.useRef<THREE.MeshStandardMaterial>(null);
-    const texturesConfigured = React.useRef(false);
 
-    // Configure textures ONCE (not every render - needsUpdate re-uploads to GPU!)
-    if (!texturesConfigured.current) {
+    // Configure textures via useEffect (proper React side-effect handling)
+    // Only runs when texture objects change, not every render frame
+    useEffect(() => {
         [dayTexture, nightTexture].forEach(t => {
             t.anisotropy = 16;
             t.colorSpace = THREE.SRGBColorSpace;
@@ -133,8 +133,7 @@ function ResponsiveScene({ isNight, config }: { isNight: boolean; config: SceneC
             t.wrapT = THREE.ClampToEdgeWrapping;
             t.needsUpdate = true;
         });
-        texturesConfigured.current = true;
-    }
+    }, [dayTexture, nightTexture]);
 
     const isMobile = size.width < 768;
     const imageAspect = config.imageAspect || 16 / 9;
