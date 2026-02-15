@@ -240,7 +240,7 @@ export interface Account {
     name: string; // Contact Name
     company: string; // Company Name
     email: string;
-    password: string; // Client panel login password
+    password?: string; // Deprecated - use passwordHash
     totalDebt: number; // Toplam Borçlanılan
     totalPaid: number; // Toplam Ödenen
     balance: number;   // Bakiye (Debt - Paid)
@@ -452,7 +452,7 @@ const INITIAL_ACCOUNTS: Account[] = [
         name: "Ahmet Yılmaz",
         company: "Tech Start A.Ş.",
         email: "ahmet@techstart.tr",
-        password: "techstart2026",
+        // password removed for security
         totalDebt: 150000,
         totalPaid: 50000,
         balance: 100000,
@@ -469,7 +469,7 @@ const INITIAL_ACCOUNTS: Account[] = [
         name: "Sarah Connor",
         company: "Cyberdyne",
         email: "sarah@cyberdyne.net",
-        password: "cyberdyne2026",
+        // password removed for security
         totalDebt: 500000,
         totalPaid: 500000,
         balance: 0,

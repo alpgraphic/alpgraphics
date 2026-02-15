@@ -78,8 +78,8 @@ export async function verifySession(): Promise<SessionData> {
             return { authenticated: false, role: null };
         }
 
-        // Verify token format
-        if (sessionToken.length < 32) {
+        // Verify token format (must be 64 hex chars)
+        if (!/^[a-f0-9]{64}$/.test(sessionToken)) {
             return { authenticated: false, role: null };
         }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getAccountsCollection } from '@/lib/mongodb';
 import { rateLimitMiddleware } from '@/lib/security/rateLimit';
+import { verifyMobileSession } from '@/lib/auth/mobileSession';
 
 // GET /api/mobile/accounts - Get accounts (admin: all, client: own)
 export async function GET(request: NextRequest) {
@@ -9,9 +9,16 @@ export async function GET(request: NextRequest) {
         const rateLimited = await rateLimitMiddleware(request, 'api');
         if (rateLimited) return rateLimited;
 
-        const cookieStore = await cookies();
-        const clientId = cookieStore.get('mobile_client_id')?.value;
-        const role = cookieStore.get('mobile_role')?.value;
+        // DB-backed session verification
+        const session = await verifyMobileSession();
+        if (!session) {
+            return NextResponse.json(
+                { success: false, error: 'Yetkilendirme gerekli' },
+                { status: 401 }
+            );
+        }
+
+        const { userId: clientId, role } = session;
 
         const accounts = await getAccountsCollection();
         const { ObjectId } = await import('mongodb');
@@ -41,12 +48,6 @@ export async function GET(request: NextRequest) {
         }
 
         // Client: return own account only
-        if (!clientId) {
-            return NextResponse.json(
-                { success: false, error: 'Yetkilendirme gerekli' },
-                { status: 401 }
-            );
-        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const account = await accounts.findOne({ _id: new ObjectId(clientId) } as any);
@@ -86,15 +87,16 @@ export async function GET(request: NextRequest) {
 // PUT /api/mobile/accounts - Update current user's account
 export async function PUT(request: NextRequest) {
     try {
-        const cookieStore = await cookies();
-        const clientId = cookieStore.get('mobile_client_id')?.value;
-
-        if (!clientId) {
+        // DB-backed session verification
+        const session = await verifyMobileSession();
+        if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Yetkilendirme gerekli' },
                 { status: 401 }
             );
         }
+
+        const clientId = session.userId;
 
         const body = await request.json();
         const { name, company } = body;

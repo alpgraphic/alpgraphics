@@ -85,8 +85,8 @@ export function middleware(request: NextRequest) {
             return res;
         }
 
-        // Token format validation
-        if (sessionToken.length < 32) {
+        // Token format validation (must be 64 hex chars)
+        if (!/^[a-f0-9]{64}$/.test(sessionToken)) {
             const res = NextResponse.redirect(new URL('/login', request.url));
             res.cookies.delete('session_token');
             res.cookies.delete('user_role');

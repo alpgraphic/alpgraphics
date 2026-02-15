@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getAccountsCollection } from '@/lib/mongodb';
 import { briefTemplates, BriefTemplate } from '@/lib/briefTypes';
+import { verifyMobileSession } from '@/lib/auth/mobileSession';
 
 // GET /api/mobile/briefs - Get user's brief data
 export async function GET() {
     try {
-        const cookieStore = await cookies();
-        const clientId = cookieStore.get('mobile_client_id')?.value;
-
-        if (!clientId) {
+        // DB-backed session verification
+        const session = await verifyMobileSession();
+        if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Yetkilendirme gerekli' },
                 { status: 401 }
             );
         }
+
+        const clientId = session.userId;
 
         const accounts = await getAccountsCollection();
         const { ObjectId } = await import('mongodb');
@@ -64,15 +65,16 @@ export async function GET() {
 // POST /api/mobile/briefs - Submit brief responses
 export async function POST(request: NextRequest) {
     try {
-        const cookieStore = await cookies();
-        const clientId = cookieStore.get('mobile_client_id')?.value;
-
-        if (!clientId) {
+        // DB-backed session verification
+        const session = await verifyMobileSession();
+        if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Yetkilendirme gerekli' },
                 { status: 401 }
             );
         }
+
+        const clientId = session.userId;
 
         const body = await request.json();
         const { responses } = body;

@@ -52,7 +52,7 @@ export interface DbAccount {
     company: string;
     email: string;
     passwordHash?: string;
-    password?: string; // Legacy plain text (temporary, for migration)
+    // password field removed - only passwordHash should be used
     twoFactorSecret?: string; // 2FA Secret Key
     role?: 'admin' | 'client'; // User role
     briefToken?: string; // Unique token for public brief form URL
