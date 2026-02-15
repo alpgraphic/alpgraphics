@@ -1,14 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAccountsCollection } from '@/lib/mongodb';
+import { rateLimitMiddleware } from '@/lib/security/rateLimit';
 
-// GET /api/mobile/accounts - Get current user's account only
+// GET /api/mobile/accounts - Get accounts (admin: all, client: own)
 export async function GET(request: NextRequest) {
     try {
+        const rateLimited = await rateLimitMiddleware(request, 'api');
+        if (rateLimited) return rateLimited;
+
         const cookieStore = await cookies();
         const clientId = cookieStore.get('mobile_client_id')?.value;
+        const role = cookieStore.get('mobile_role')?.value;
 
-        // SECURITY: Must have client ID to access
+        const accounts = await getAccountsCollection();
+        const { ObjectId } = await import('mongodb');
+
+        // Admin: return all client accounts
+        if (role === 'admin') {
+            const allAccounts = await accounts
+                .find({ role: { $ne: 'admin' } })
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            return NextResponse.json({
+                success: true,
+                data: allAccounts.map(acc => ({
+                    id: acc._id?.toString(),
+                    name: acc.name,
+                    company: acc.company,
+                    email: acc.email,
+                    balance: acc.balance || 0,
+                    totalDebt: acc.totalDebt || 0,
+                    totalPaid: acc.totalPaid || 0,
+                    briefStatus: acc.briefStatus,
+                    briefFormType: acc.briefFormType,
+                    createdAt: acc.createdAt,
+                })),
+            });
+        }
+
+        // Client: return own account only
         if (!clientId) {
             return NextResponse.json(
                 { success: false, error: 'Yetkilendirme gerekli' },
@@ -16,9 +48,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const accounts = await getAccountsCollection();
-        const { ObjectId } = await import('mongodb');
-        
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const account = await accounts.findOne({ _id: new ObjectId(clientId) } as any);
 
@@ -29,7 +58,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Return only the client's own account data
         return NextResponse.json({
             success: true,
             data: {
@@ -37,9 +65,9 @@ export async function GET(request: NextRequest) {
                 name: account.name,
                 company: account.company,
                 email: account.email,
-                balance: account.balance,
-                totalDebt: account.totalDebt,
-                totalPaid: account.totalPaid,
+                balance: account.balance || 0,
+                totalDebt: account.totalDebt || 0,
+                totalPaid: account.totalPaid || 0,
                 briefStatus: account.briefStatus,
                 briefFormType: account.briefFormType,
                 createdAt: account.createdAt,

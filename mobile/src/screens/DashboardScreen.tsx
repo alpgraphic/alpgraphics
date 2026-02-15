@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,9 +7,10 @@ import {
     TouchableOpacity,
     RefreshControl,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, SPACING } from '../lib/constants';
+import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { logout, apiRequest, isBiometricAvailable, authenticateWithBiometric } from '../lib/auth';
 
 type Props = {
@@ -22,27 +23,75 @@ interface BriefData {
     submittedAt?: string;
 }
 
+interface Project {
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+    progress: number;
+}
+
+interface Transaction {
+    id: string;
+    type: 'Debt' | 'Payment';
+    amount: number;
+    description: string;
+    date: string;
+}
+
+interface AccountData {
+    name: string;
+    company: string;
+    balance: number;
+    totalDebt: number;
+    totalPaid: number;
+}
+
 export default function DashboardScreen({ navigation }: Props) {
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [briefData, setBriefData] = useState<BriefData>({ status: 'pending' });
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [account, setAccount] = useState<AccountData | null>(null);
     const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-    useEffect(() => {
-        checkBiometric();
-        loadData();
+    const loadData = useCallback(async () => {
+        try {
+            const [briefResult, projectsResult, transResult, accountResult] = await Promise.all([
+                apiRequest<{ data: BriefData }>('/api/mobile/briefs'),
+                apiRequest<{ data: Project[] }>('/api/mobile/projects'),
+                apiRequest<{ data: Transaction[] }>('/api/mobile/transactions'),
+                apiRequest<{ data: AccountData }>('/api/mobile/accounts'),
+            ]);
+
+            if (briefResult.success && briefResult.data?.data) {
+                setBriefData(briefResult.data.data);
+            }
+            if (projectsResult.success && projectsResult.data?.data) {
+                setProjects(projectsResult.data.data);
+            }
+            if (transResult.success && transResult.data?.data) {
+                setTransactions(transResult.data.data);
+            }
+            if (accountResult.success && accountResult.data?.data) {
+                const accData = accountResult.data.data;
+                // Handle single object (not array)
+                if (!Array.isArray(accData)) {
+                    setAccount(accData as any);
+                }
+            }
+        } catch (error) {
+            console.log('Dashboard data fetch failed');
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    const checkBiometric = async () => {
-        const available = await isBiometricAvailable();
-        setBiometricEnabled(available);
-    };
-
-    const loadData = async () => {
-        const result = await apiRequest<{ data: BriefData }>('/api/mobile/briefs');
-        if (result.success && result.data) {
-            setBriefData(result.data.data || { status: 'pending' });
-        }
-    };
+    useEffect(() => {
+        isBiometricAvailable().then(setBiometricEnabled);
+        loadData();
+    }, [loadData]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -122,6 +171,82 @@ export default function DashboardScreen({ navigation }: Props) {
                         </View>
                         <Text style={styles.actionArrow}>→</Text>
                     </TouchableOpacity>
+                )}
+
+                {/* Account Balance */}
+                {account && (
+                    <View style={styles.balanceCard}>
+                        <View style={styles.balanceRow}>
+                            <View style={styles.balanceItem}>
+                                <Text style={styles.balanceLabel}>Toplam Borç</Text>
+                                <Text style={[styles.balanceValue, { color: COLORS.error || '#cf222e' }]}>
+                                    ₺{(account.totalDebt || 0).toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.balanceDivider} />
+                            <View style={styles.balanceItem}>
+                                <Text style={styles.balanceLabel}>Ödenen</Text>
+                                <Text style={[styles.balanceValue, { color: COLORS.success || '#1a7f37' }]}>
+                                    ₺{(account.totalPaid || 0).toLocaleString()}
+                                </Text>
+                            </View>
+                            <View style={styles.balanceDivider} />
+                            <View style={styles.balanceItem}>
+                                <Text style={styles.balanceLabel}>Bakiye</Text>
+                                <Text style={[styles.balanceValue, { color: COLORS.primary }]}>
+                                    ₺{(account.balance || 0).toLocaleString()}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                {/* Projects Section */}
+                {projects.length > 0 && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Projelerim</Text>
+                        {projects.map(project => (
+                            <View key={project.id} style={styles.projectCard}>
+                                <View style={styles.projectInfo}>
+                                    <Text style={styles.projectTitle}>{project.title}</Text>
+                                    <Text style={styles.projectCategory}>{project.category}</Text>
+                                </View>
+                                {project.progress > 0 && (
+                                    <View style={styles.progressContainer}>
+                                        <View style={styles.progressBar}>
+                                            <View style={[styles.progressFill, { width: `${Math.min(project.progress, 100)}%` }]} />
+                                        </View>
+                                        <Text style={styles.progressText}>{project.progress}%</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Recent Transactions */}
+                {transactions.length > 0 && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Son İşlemler</Text>
+                        {transactions.slice(0, 5).map(tx => (
+                            <View key={tx.id} style={styles.transactionRow}>
+                                <View style={[styles.txDot, {
+                                    backgroundColor: tx.type === 'Payment' ? (COLORS.success || '#1a7f37') : (COLORS.error || '#cf222e')
+                                }]} />
+                                <View style={styles.txInfo}>
+                                    <Text style={styles.txDesc}>{tx.description || (tx.type === 'Payment' ? 'Ödeme' : 'Borç')}</Text>
+                                    <Text style={styles.txDate}>
+                                        {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                    </Text>
+                                </View>
+                                <Text style={[styles.txAmount, {
+                                    color: tx.type === 'Payment' ? (COLORS.success || '#1a7f37') : (COLORS.error || '#cf222e')
+                                }]}>
+                                    {tx.type === 'Payment' ? '-' : '+'}₺{tx.amount.toLocaleString()}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
                 )}
 
                 {/* Info Cards */}
@@ -366,5 +491,121 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: COLORS.text,
+    },
+    // Balance card
+    balanceCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: SPACING.lg,
+        marginBottom: SPACING.md,
+    },
+    balanceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    balanceItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    balanceDivider: {
+        width: 1,
+        height: 32,
+        backgroundColor: COLORS.border,
+    },
+    balanceLabel: {
+        fontSize: 10,
+        fontWeight: '700' as const,
+        color: COLORS.textMuted,
+        textTransform: 'uppercase' as const,
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    balanceValue: {
+        fontSize: 16,
+        fontWeight: '900' as const,
+    },
+    // Section
+    sectionContainer: {
+        marginBottom: SPACING.md,
+    },
+    sectionTitle: {
+        fontSize: 10,
+        fontWeight: '700' as const,
+        color: COLORS.textMuted,
+        textTransform: 'uppercase' as const,
+        letterSpacing: 1,
+        marginBottom: SPACING.sm,
+    },
+    // Project card
+    projectCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        padding: SPACING.md,
+        marginBottom: SPACING.sm,
+    },
+    projectInfo: {
+        marginBottom: SPACING.sm,
+    },
+    projectTitle: {
+        fontSize: 15,
+        fontWeight: '700' as const,
+        color: COLORS.text,
+    },
+    projectCategory: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginTop: 2,
+    },
+    progressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    progressBar: {
+        flex: 1,
+        height: 4,
+        backgroundColor: COLORS.border,
+        borderRadius: 2,
+        marginRight: SPACING.sm,
+    },
+    progressFill: {
+        height: '100%' as any,
+        backgroundColor: COLORS.primary,
+        borderRadius: 2,
+    },
+    progressText: {
+        fontSize: 11,
+        fontWeight: '600' as const,
+        color: COLORS.textMuted,
+    },
+    // Transaction
+    transactionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        padding: SPACING.md,
+        marginBottom: SPACING.xs,
+    },
+    txDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: SPACING.md,
+    },
+    txInfo: {
+        flex: 1,
+    },
+    txDesc: {
+        fontSize: 14,
+        fontWeight: '600' as const,
+        color: COLORS.text,
+    },
+    txDate: {
+        fontSize: 11,
+        color: COLORS.textMuted,
+    },
+    txAmount: {
+        fontSize: 15,
+        fontWeight: '700' as const,
     },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,20 +8,26 @@ import {
     TextInput,
     Alert,
     Modal,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
+import { apiRequest } from '../lib/auth';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
 };
 
 interface Account {
-    id: number;
+    id: string;
     name: string;
     company: string;
     email: string;
-    status: 'none' | 'pending' | 'submitted' | 'approved';
+    balance: number;
+    totalDebt: number;
+    totalPaid: number;
+    briefStatus: 'none' | 'pending' | 'submitted' | 'approved';
 }
 
 export default function AdminAccountsScreen({ navigation }: Props) {
@@ -30,33 +36,71 @@ export default function AdminAccountsScreen({ navigation }: Props) {
     const [newCompany, setNewCompany] = useState('');
     const [newEmail, setNewEmail] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [accounts, setAccounts] = useState<Account[]>([]);
 
-    const [accounts, setAccounts] = useState<Account[]>([
-        { id: 1, name: 'Ahmet Yılmaz', company: 'Tech Start A.Ş.', email: 'ahmet@techstart.tr', status: 'submitted' },
-        { id: 2, name: 'Zeynep Kaya', company: 'Design Co', email: 'zeynep@design.co', status: 'pending' },
-        { id: 3, name: 'Mehmet Demir', company: 'Startup Labs', email: 'mehmet@startup.io', status: 'approved' },
-    ]);
+    const loadAccounts = useCallback(async () => {
+        try {
+            const result = await apiRequest<{ data: Account[] }>('/api/mobile/accounts');
+            if (result.success && result.data?.data) {
+                const data = result.data.data;
+                // Handle both array (admin) and single object (shouldn't happen here)
+                setAccounts(Array.isArray(data) ? data : [data]);
+            }
+        } catch (error) {
+            console.log('Accounts fetch failed');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const handleCreate = () => {
+    useEffect(() => {
+        loadAccounts();
+    }, [loadAccounts]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadAccounts();
+        setRefreshing(false);
+    };
+
+    const handleCreate = async () => {
         if (!newName || !newCompany || !newEmail || !newPassword) {
             Alert.alert('Hata', 'Tüm alanları doldurun');
             return;
         }
 
-        setAccounts([{
-            id: Date.now(),
-            name: newName,
-            company: newCompany,
-            email: newEmail,
-            status: 'none',
-        }, ...accounts]);
+        if (newPassword.length < 6) {
+            Alert.alert('Hata', 'Şifre en az 6 karakter olmalıdır');
+            return;
+        }
 
-        Alert.alert('Başarılı', `${newCompany} hesabı oluşturuldu`);
-        setShowModal(false);
-        setNewName('');
-        setNewCompany('');
-        setNewEmail('');
-        setNewPassword('');
+        try {
+            const result = await apiRequest('/api/accounts', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: newName.trim(),
+                    company: newCompany.trim(),
+                    email: newEmail.trim().toLowerCase(),
+                    password: newPassword,
+                }),
+            });
+
+            if (result.success) {
+                Alert.alert('Başarılı', `${newCompany} hesabı oluşturuldu`);
+                setShowModal(false);
+                setNewName('');
+                setNewCompany('');
+                setNewEmail('');
+                setNewPassword('');
+                loadAccounts(); // Refresh list
+            } else {
+                Alert.alert('Hata', result.error || 'Hesap oluşturulamadı');
+            }
+        } catch (error) {
+            Alert.alert('Hata', 'Bağlantı hatası');
+        }
     };
 
     const getStatusLabel = (status: string) => {
@@ -91,15 +135,31 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-                {accounts.map(account => {
-                    const statusStyle = getStatusStyle(account.status);
+            <ScrollView
+                style={styles.scroll}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+            >
+                {loading ? (
+                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                        <ActivityIndicator color={COLORS.primary} size="large" />
+                    </View>
+                ) : accounts.length === 0 ? (
+                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz hesap yok</Text>
+                    </View>
+                ) : (
+                accounts.map(account => {
+                    const statusStyle = getStatusStyle(account.briefStatus || 'none');
                     return (
                         <TouchableOpacity
                             key={account.id}
                             style={styles.card}
                             activeOpacity={0.7}
-                            onPress={() => Alert.alert(account.company, `${account.email}\nDurum: ${getStatusLabel(account.status)}`)}
+                            onPress={() => Alert.alert(
+                                account.company || account.name,
+                                `${account.email}\nBakiye: ₺${(account.balance || 0).toLocaleString()}\nDurum: ${getStatusLabel(account.briefStatus || 'none')}`
+                            )}
                         >
                             <View style={styles.cardAvatar}>
                                 <Text style={styles.avatarText}>{account.name[0]}</Text>
@@ -110,12 +170,13 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                             </View>
                             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
                                 <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                                    {getStatusLabel(account.status)}
+                                    {getStatusLabel(account.briefStatus || 'none')}
                                 </Text>
                             </View>
                         </TouchableOpacity>
                     );
-                })}
+                })
+                )}
                 <View style={{ height: 40 }} />
             </ScrollView>
 
