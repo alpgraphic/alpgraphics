@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getAccountsCollection, getTransactionsCollection, getProjectsCollection } from '@/lib/mongodb';
 import { rateLimitMiddleware } from '@/lib/security/rateLimit';
+import { verifyMobileSession } from '@/lib/auth/mobileSession';
 
 // GET /api/mobile/dashboard - Admin dashboard stats
 export async function GET(request: NextRequest) {
@@ -10,10 +10,9 @@ export async function GET(request: NextRequest) {
         const rateLimited = await rateLimitMiddleware(request, 'api');
         if (rateLimited) return rateLimited;
 
-        const cookieStore = await cookies();
-        const role = cookieStore.get('mobile_role')?.value;
-
-        if (role !== 'admin') {
+        // Verify session against DB
+        const session = await verifyMobileSession();
+        if (!session || session.role !== 'admin') {
             return NextResponse.json(
                 { success: false, error: 'Admin yetkisi gerekli' },
                 { status: 403 }

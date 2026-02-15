@@ -45,20 +45,48 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { accountId, type, amount, description, date } = body;
 
-        if (!accountId || !type || !amount) {
+        if (!accountId || !type || amount === undefined || amount === null) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+        }
+
+        // Validate amount is a valid number
+        const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            return NextResponse.json({ error: 'Gecersiz tutar' }, { status: 400 });
+        }
+
+        // Validate type
+        if (!['Debt', 'Payment'].includes(type)) {
+            return NextResponse.json({ error: 'Gecersiz islem tipi (Debt veya Payment)' }, { status: 400 });
+        }
+
+        // Validate date
+        const parsedDate = date ? new Date(date) : new Date();
+        if (isNaN(parsedDate.getTime())) {
+            return NextResponse.json({ error: 'Gecersiz tarih' }, { status: 400 });
+        }
+
+        // Validate accountId is a valid ObjectId
+        if (!ObjectId.isValid(accountId)) {
+            return NextResponse.json({ error: 'Gecersiz hesap ID' }, { status: 400 });
         }
 
         const transactions = await getTransactionsCollection();
         const accounts = await getAccountsCollection();
 
+        // Verify account exists
+        const account = await accounts.findOne({ _id: new ObjectId(accountId) } as any);
+        if (!account) {
+            return NextResponse.json({ error: 'Hesap bulunamadi' }, { status: 404 });
+        }
+
         // 1. Create Transaction
         const newTransaction = {
             accountId,
             type,
-            amount: parseFloat(amount),
+            amount: parsedAmount,
             description: description || '',
-            date: new Date(date),
+            date: parsedDate,
             createdAt: new Date()
         };
 
@@ -70,9 +98,9 @@ export async function POST(request: NextRequest) {
         const updateDoc: any = { $set: { updatedAt: new Date() } };
 
         if (type === 'Debt') {
-            updateDoc.$inc = { totalDebt: parseFloat(amount), balance: parseFloat(amount) };
+            updateDoc.$inc = { totalDebt: parsedAmount, balance: parsedAmount };
         } else if (type === 'Payment') {
-            updateDoc.$inc = { totalPaid: parseFloat(amount), balance: -parseFloat(amount) };
+            updateDoc.$inc = { totalPaid: parsedAmount, balance: -parsedAmount };
         }
 
         await accounts.updateOne(

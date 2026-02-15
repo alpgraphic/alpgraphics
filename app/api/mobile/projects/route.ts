@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getProjectsCollection, getAccountsCollection } from '@/lib/mongodb';
+import { getProjectsCollection } from '@/lib/mongodb';
 import { rateLimitMiddleware } from '@/lib/security/rateLimit';
+import { verifyMobileSession } from '@/lib/auth/mobileSession';
 
 // GET /api/mobile/projects - Get projects for authenticated user
 export async function GET(request: NextRequest) {
@@ -10,16 +11,18 @@ export async function GET(request: NextRequest) {
         const rateLimited = await rateLimitMiddleware(request, 'api');
         if (rateLimited) return rateLimited;
 
-        const cookieStore = await cookies();
-        const clientId = cookieStore.get('mobile_client_id')?.value;
-        const role = cookieStore.get('mobile_role')?.value;
-
-        if (!clientId && role !== 'admin') {
+        // Verify session against DB
+        const session = await verifyMobileSession();
+        if (!session) {
             return NextResponse.json(
                 { success: false, error: 'Yetkilendirme gerekli' },
                 { status: 401 }
             );
         }
+
+        const cookieStore = await cookies();
+        const clientId = cookieStore.get('mobile_client_id')?.value;
+        const role = session.role;
 
         const projects = await getProjectsCollection();
 

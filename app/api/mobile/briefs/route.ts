@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAccountsCollection } from '@/lib/mongodb';
 import { briefTemplates, BriefTemplate } from '@/lib/briefTypes';
 import { verifyMobileSession } from '@/lib/auth/mobileSession';
+import { rateLimitMiddleware } from '@/lib/security/rateLimit';
 
 // GET /api/mobile/briefs - Get user's brief data
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        const rateLimited = await rateLimitMiddleware(request, 'api');
+        if (rateLimited) return rateLimited;
+
         // DB-backed session verification
         const session = await verifyMobileSession();
         if (!session) {

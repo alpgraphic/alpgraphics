@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
-import { generateToken } from '@/lib/auth';
 import { getAccountsCollection } from '@/lib/mongodb';
 import { checkRateLimit, getClientIP } from '@/lib/security/rateLimit';
+import { createMobileSession, refreshMobileSession, destroyMobileSession } from '@/lib/auth/mobileSession';
 
 interface TokenResponse {
     success: boolean;
@@ -80,48 +80,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
                 );
             }
 
-            // Admin requires 2FA
+            // Admin requires 2FA - always
             if (admin.twoFactorSecret) {
                 return NextResponse.json({
                     success: true,
                     requires2FA: true,
-                } as any);
+                    adminId: admin._id!.toString(),
+                });
             }
 
-            const accessToken = generateToken();
-            const refreshToken = generateToken();
-
-            cookieStore.set('mobile_access_token', accessToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 15 * 60,
-                path: '/',
-            });
-
-            cookieStore.set('mobile_refresh_token', refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60,
-                path: '/',
-            });
-
-            cookieStore.set('mobile_role', 'admin', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60,
-                path: '/',
-            });
-
-            return NextResponse.json({
-                success: true,
-                accessToken,
-                refreshToken,
-                expiresIn: 15 * 60,
-                role: 'admin',
-            });
+            // No 2FA secret set — block login (must set up 2FA first via web)
+            return NextResponse.json(
+                { success: false, error: '2FA kurulumu eksik. Lutfen web panelden 2FA ayarlayin.' },
+                { status: 403 }
+            );
         }
 
         // Client login
@@ -151,45 +123,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
                 );
             }
 
-            const accessToken = generateToken();
-            const refreshToken = generateToken();
-
-            cookieStore.set('mobile_access_token', accessToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 15 * 60,
-                path: '/',
-            });
-
-            cookieStore.set('mobile_refresh_token', refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60,
-                path: '/',
-            });
-
-            cookieStore.set('mobile_client_id', account._id!.toString(), {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60,
-                path: '/',
-            });
-
-            cookieStore.set('mobile_role', 'client', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60,
-                path: '/',
-            });
+            // Create DB-backed session
+            const tokens = await createMobileSession(
+                account._id!.toString(),
+                account.email,
+                'client'
+            );
 
             return NextResponse.json({
                 success: true,
-                accessToken,
-                refreshToken,
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
                 expiresIn: 15 * 60,
                 role: 'client',
                 account: {
@@ -229,43 +173,21 @@ export async function PUT(request: NextRequest): Promise<NextResponse<TokenRespo
             );
         }
 
-        // Verify refresh token from httpOnly cookie (not from request body)
-        const cookieStore = await cookies();
-        const storedRefreshToken = cookieStore.get('mobile_refresh_token')?.value;
-        const storedRole = cookieStore.get('mobile_role')?.value;
+        // Use DB-backed refresh
+        const result = await refreshMobileSession();
 
-        if (!storedRefreshToken) {
+        if (!result.success) {
             return NextResponse.json(
                 { success: false, error: 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' },
                 { status: 401 }
             );
         }
 
-        // Validate token format
-        if (storedRefreshToken.length < 32) {
-            return NextResponse.json(
-                { success: false, error: 'Geçersiz token. Lütfen tekrar giriş yapın.' },
-                { status: 401 }
-            );
-        }
-
-        // Generate new access token
-        const newAccessToken = generateToken();
-
-        // Update access token cookie
-        cookieStore.set('mobile_access_token', newAccessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60,
-            path: '/',
-        });
-
         return NextResponse.json({
             success: true,
-            accessToken: newAccessToken,
+            accessToken: result.accessToken,
             expiresIn: 15 * 60,
-            role: storedRole || undefined,
+            role: result.role || undefined,
         });
 
     } catch (error) {
@@ -280,11 +202,8 @@ export async function PUT(request: NextRequest): Promise<NextResponse<TokenRespo
 // DELETE /api/mobile/auth - Logout
 export async function DELETE(): Promise<NextResponse> {
     try {
-        const cookieStore = await cookies();
-        cookieStore.delete('mobile_access_token');
-        cookieStore.delete('mobile_refresh_token');
-        cookieStore.delete('mobile_client_id');
-        cookieStore.delete('mobile_role');
+        // Destroy session from DB + clear cookies
+        await destroyMobileSession();
 
         return NextResponse.json({
             success: true,

@@ -104,12 +104,25 @@ export async function PUT(request: NextRequest) {
             }
         }
 
-        const result = await collection.updateOne(
-            { id: id },
-            { $set: safeUpdates }
-        );
+        // Try ObjectId first, then numeric id
+        let result;
+        if (ObjectId.isValid(id) && String(new ObjectId(id)) === id) {
+            result = await collection.updateOne(
+                { _id: new ObjectId(id) } as any,
+                { $set: safeUpdates }
+            );
+        }
+        if (!result || result.matchedCount === 0) {
+            const numericId = typeof id === 'number' ? id : parseInt(id);
+            if (!isNaN(numericId)) {
+                result = await collection.updateOne(
+                    { id: numericId },
+                    { $set: safeUpdates }
+                );
+            }
+        }
 
-        if (result.matchedCount === 0) {
+        if (!result || result.matchedCount === 0) {
             return NextResponse.json({ error: 'Teklif bulunamadı' }, { status: 404 });
         }
 
