@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
+import { COLORS, SPACING, FONTS, RADIUS, TOKEN_KEYS } from '../lib/constants';
+import { login, storage } from '../lib/auth';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = {
-    navigation: NativeStackNavigationProp<any>;
+    navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
 export default function LoginScreen({ navigation }: Props) {
@@ -27,24 +29,47 @@ export default function LoginScreen({ navigation }: Props) {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleLogin = async () => {
-        if (!email || !password) {
+        const trimmedEmail = email.trim().toLowerCase();
+
+        if (!trimmedEmail || !password) {
             Alert.alert('', 'E-posta ve şifre gerekli');
             return;
         }
 
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            Alert.alert('', 'Geçerli bir e-posta adresi girin');
+            return;
+        }
+
+        if (password.length < 6) {
+            Alert.alert('', 'Şifre en az 6 karakter olmalıdır');
+            return;
+        }
+
         setIsLoading(true);
-        setTimeout(() => {
-            setIsLoading(false);
-            if (role === 'admin') {
-                navigation.replace('AdminDashboard');
-            } else {
-                if (email === 'ahmet@techstart.tr' && password === 'techstart2026') {
-                    navigation.replace('Dashboard');
+
+        try {
+            const result = await login(trimmedEmail, password, role);
+
+            if (result.requires2FA && result.adminId) {
+                // Navigate to 2FA screen
+                navigation.navigate('TwoFactor', { adminId: result.adminId });
+            } else if (result.success) {
+                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role }));
+
+                if (role === 'admin') {
+                    navigation.replace('AdminDashboard');
                 } else {
-                    Alert.alert('', 'Hatalı giriş bilgileri');
+                    navigation.replace('Dashboard');
                 }
+            } else {
+                Alert.alert('Giris Basarisiz', result.error || 'E-posta veya sifre hatali');
             }
-        }, 500);
+        } catch (error) {
+            Alert.alert('Hata', 'Bağlantı hatası. Lütfen tekrar deneyin.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -62,7 +87,9 @@ export default function LoginScreen({ navigation }: Props) {
                             <View style={styles.brandDot} />
                             <Text style={styles.brandText}>alpgraphics</Text>
                         </View>
-                        <Text style={styles.brandSub}>Müşteri Portalı</Text>
+                        <Text style={styles.brandSub}>
+                            {role === 'admin' ? 'Yönetim Paneli' : 'Müşteri Portalı'}
+                        </Text>
                     </View>
 
                     {/* Role Toggle */}
@@ -126,13 +153,10 @@ export default function LoginScreen({ navigation }: Props) {
                         )}
                     </TouchableOpacity>
 
-                    {/* Demo */}
-                    {role === 'client' && (
-                        <View style={styles.demoSection}>
-                            <Text style={styles.demoLabel}>Demo hesap</Text>
-                            <Text style={styles.demoValue}>ahmet@techstart.tr / techstart2026</Text>
-                        </View>
-                    )}
+                    {/* Forgot Password Hint */}
+                    <TouchableOpacity style={styles.forgotSection} activeOpacity={0.6}>
+                        <Text style={styles.forgotText}>Şifrenizi mi unuttunuz?</Text>
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
 
@@ -244,21 +268,12 @@ const styles = StyleSheet.create({
         color: COLORS.textInverse,
         letterSpacing: 0.5,
     },
-    demoSection: {
+    forgotSection: {
         alignItems: 'center',
-        padding: SPACING.md,
-        backgroundColor: COLORS.primaryLight,
-        borderRadius: RADIUS.md,
     },
-    demoLabel: {
-        fontSize: FONTS.xs,
-        fontWeight: FONTS.semibold,
-        color: COLORS.primary,
-        marginBottom: SPACING.xs,
-    },
-    demoValue: {
+    forgotText: {
         fontSize: FONTS.sm,
-        color: COLORS.textSecondary,
+        color: COLORS.textMuted,
     },
     footer: {
         fontSize: FONTS.xs,

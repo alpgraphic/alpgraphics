@@ -31,7 +31,7 @@ export default function OrganicNatural({ brandPage }: OrganicNaturalProps) {
     const logoDarkSize = brandPage.sizeConfig?.logoDarkSize || 200;
     const iconLightSize = brandPage.sizeConfig?.iconLightSize || 180;
     const iconDarkSize = brandPage.sizeConfig?.iconDarkSize || 180;
-    const heroLogoSize = brandPage.heroConfig?.logoSize || 320;
+    const heroLogoSize = brandPage.heroConfig?.logoSize || 400;
     const headingFontSize = brandPage.sizeConfig?.headingFontSize || 72;
     const bodyFontSize = brandPage.sizeConfig?.bodyFontSize || 18;
 
@@ -177,7 +177,7 @@ export default function OrganicNatural({ brandPage }: OrganicNaturalProps) {
                                         src={logos.dark}
                                         alt="Primary"
                                         className="object-contain"
-                                        style={{ maxWidth: `${logoDarkSize}px`, maxHeight: `${logoDarkSize * 0.5}px` }}
+                                        style={{ maxWidth: `${logoDarkSize}px`, maxHeight: `${logoDarkSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-3xl italic" style={{ color: warmBrown, ...headingFontStyle }}>{brandName}</span>
@@ -198,7 +198,7 @@ export default function OrganicNatural({ brandPage }: OrganicNaturalProps) {
                                         src={logos.light}
                                         alt="Inverted"
                                         className="object-contain"
-                                        style={{ maxWidth: `${logoLightSize}px`, maxHeight: `${logoLightSize * 0.5}px` }}
+                                        style={{ maxWidth: `${logoLightSize}px`, maxHeight: `${logoLightSize}px` }}
                                     />
                                 ) : (
                                     <span className="text-3xl italic text-white" style={headingFontStyle}>{brandName}</span>

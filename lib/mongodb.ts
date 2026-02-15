@@ -52,7 +52,7 @@ export interface DbAccount {
     company: string;
     email: string;
     passwordHash?: string;
-    password?: string; // Legacy plain text (temporary, for migration)
+    // password field removed - only passwordHash should be used
     twoFactorSecret?: string; // 2FA Secret Key
     role?: 'admin' | 'client'; // User role
     briefToken?: string; // Unique token for public brief form URL
@@ -132,7 +132,22 @@ export interface DbProposal {
         unitPrice: number;
     }>;
     logoText?: string;
+    logoSubtext?: string;
+    logoUrl?: string;
     primaryColor?: string;
+    currencySymbol?: string;
+    taxRate?: number;
+    attnText?: string;
+    preparedForLabel?: string;
+    projectLabel?: string;
+    footerName?: string;
+    footerTitle?: string;
+    footerNote?: string;
+    website?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    notes?: string;
     createdAt: Date;
     updatedAt: Date;
 }

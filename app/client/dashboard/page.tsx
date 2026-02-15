@@ -170,28 +170,28 @@ export default function ClientDashboard() {
         <div className="min-h-screen bg-[#f5f3e9] text-[#1a1a1a]">
             {/* Header */}
             <header className="border-b border-black/10 bg-white/80 backdrop-blur-xl sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-[900] tracking-tight">alpgraphics</h1>
-                        <p className="text-[10px] opacity-40 uppercase tracking-widest">Müşteri Paneli</p>
+                        <h1 className="text-lg sm:text-xl font-[900] tracking-tight">alpgraphics</h1>
+                        <p className="text-[10px] opacity-40 uppercase tracking-widest hidden sm:block">Musteri Paneli</p>
                     </div>
-                    <div className="flex items-center gap-6">
-                        <div className="text-right">
+                    <div className="flex items-center gap-3 sm:gap-6">
+                        <div className="text-right hidden sm:block">
                             <p className="text-sm font-bold">{account.company}</p>
                             <p className="text-xs opacity-40">{account.name}</p>
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="text-xs font-bold opacity-40 hover:opacity-100 uppercase tracking-widest"
+                            className="text-xs font-bold opacity-40 hover:opacity-100 uppercase tracking-widest px-3 py-2 rounded-lg hover:bg-black/5 transition-colors"
                         >
-                            Çıkış
+                            Cikis
                         </button>
                     </div>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="max-w-5xl mx-auto px-6 py-12">
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
                 <AnimatePresence mode="wait">
                     {/* NO FORM ASSIGNED YET - Full Page Welcome */}
                     {account.briefStatus === 'none' && (

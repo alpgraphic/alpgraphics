@@ -100,10 +100,11 @@ export async function checkRateLimit(
             resetAt: existing.expiresAt,
         };
     } catch (error) {
+        // FAIL CLOSED: On DB error, deny the request for safety
         console.error('Rate limit check error:', error);
         return {
-            allowed: true,
-            remaining: config.maxRequests,
+            allowed: false,
+            remaining: 0,
             resetAt: new Date(now.getTime() + config.windowMs),
         };
     }

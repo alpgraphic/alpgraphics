@@ -31,7 +31,7 @@ export default function MinimalClean({ brandPage }: MinimalCleanProps) {
     const logoDarkSize = brandPage.sizeConfig?.logoDarkSize || 200;
     const iconLightSize = brandPage.sizeConfig?.iconLightSize || 180;
     const iconDarkSize = brandPage.sizeConfig?.iconDarkSize || 180;
-    const heroLogoSize = brandPage.heroConfig?.logoSize || 300;
+    const heroLogoSize = brandPage.heroConfig?.logoSize || 400;
     const headingFontSize = brandPage.sizeConfig?.headingFontSize || 72;
     const bodyFontSize = brandPage.sizeConfig?.bodyFontSize || 18;
 

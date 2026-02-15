@@ -79,20 +79,22 @@ export default function Scene({ isNight = false, toggleTheme }: { isNight?: bool
 
 function CameraHandler({ isNight }: { isNight: boolean }) {
     const { camera, size } = useThree();
-    const vec = new THREE.Vector3();
+    // Pre-allocate vector to avoid creating new objects every frame (60fps = 60 allocations/sec)
+    const targetPos = useMemo(() => new THREE.Vector3(), []);
 
     useFrame((state, delta) => {
         const isMobile = size.width < 768;
 
-        // Define targets based on mode
-        // Night: Pull back significantly to show "more" and put button at top
-        const targetPos = isNight
-            ? (isMobile ? new THREE.Vector3(0, 30, 20) : new THREE.Vector3(0, 20, 14))
-            : (isMobile ? new THREE.Vector3(0, 30, 20) : new THREE.Vector3(0, 20, 14));
+        // Reuse pre-allocated vector
+        if (isMobile) {
+            targetPos.set(0, 30, 20);
+        } else {
+            targetPos.set(0, 20, 14);
+        }
 
         // Smoothly lerp camera position
         state.camera.position.lerp(targetPos, delta * 0.5);
-        state.camera.lookAt(0, 0, 0); // Keep looking at center
+        state.camera.lookAt(0, 0, 0);
     });
 
     // Initial setup (optional, but good for first render)
@@ -118,17 +120,20 @@ function ResponsiveScene({ isNight, config }: { isNight: boolean; config: SceneC
     const nightPlaneRef = React.useRef<THREE.Mesh>(null);
     const floorMaterialRef = React.useRef<THREE.MeshStandardMaterial>(null);
 
-    // Configure textures
-    [dayTexture, nightTexture].forEach(t => {
-        t.anisotropy = 16;
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.minFilter = THREE.LinearMipmapLinearFilter;
-        t.magFilter = THREE.LinearFilter;
-        t.generateMipmaps = true;
-        t.wrapS = THREE.ClampToEdgeWrapping;
-        t.wrapT = THREE.ClampToEdgeWrapping;
-        t.needsUpdate = true;
-    });
+    // Configure textures via useEffect (proper React side-effect handling)
+    // Only runs when texture objects change, not every render frame
+    useEffect(() => {
+        [dayTexture, nightTexture].forEach(t => {
+            t.anisotropy = 16;
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.minFilter = THREE.LinearMipmapLinearFilter;
+            t.magFilter = THREE.LinearFilter;
+            t.generateMipmaps = true;
+            t.wrapS = THREE.ClampToEdgeWrapping;
+            t.wrapT = THREE.ClampToEdgeWrapping;
+            t.needsUpdate = true;
+        });
+    }, [dayTexture, nightTexture]);
 
     const isMobile = size.width < 768;
     const imageAspect = config.imageAspect || 16 / 9;
@@ -144,14 +149,16 @@ function ResponsiveScene({ isNight, config }: { isNight: boolean; config: SceneC
     const dayHeight = dayWidth / imageAspect;
     const nightHeight = nightWidth / imageAspect;
 
+    // Pre-allocate color objects to avoid GC pressure (60 allocations/sec -> 0)
+    const floorColorDay = useMemo(() => new THREE.Color("#f5f3e9"), []);
+    const floorColorNight = useMemo(() => new THREE.Color("#080808"), []);
+
     useFrame((state, delta) => {
         // 1. Fade Night Plane Opacity
         if (nightPlaneRef.current) {
             const targetOpacity = isNight ? 1 : 0;
             const mat = nightPlaneRef.current.material as THREE.MeshStandardMaterial;
             mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, delta * 2);
-            mat.transparent = true;
-            mat.needsUpdate = true;
         }
 
         // 2. Fade Day Plane Opacity (Cross-fade)
@@ -159,13 +166,11 @@ function ResponsiveScene({ isNight, config }: { isNight: boolean; config: SceneC
             const targetOpacity = isNight ? 0 : 1;
             const mat = dayPlaneRef.current.material as THREE.MeshStandardMaterial;
             mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, delta * 2);
-            mat.transparent = true;
-            mat.needsUpdate = true;
         }
 
-        // 3. Smoothly transition floor color
+        // 3. Smoothly transition floor color (reuse pre-allocated Color objects)
         if (floorMaterialRef.current) {
-            const targetColor = new THREE.Color(isNight ? "#080808" : "#f5f3e9");
+            const targetColor = isNight ? floorColorNight : floorColorDay;
             floorMaterialRef.current.color.lerp(targetColor, delta * 2);
         }
     });

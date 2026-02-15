@@ -49,6 +49,7 @@ export default function EditorialLuxury({ brandPage }: EditorialLuxuryProps) {
                     year={brandPage.heroConfig?.year || new Date().getFullYear().toString()}
                     background={aiDecisions?.heroBackground || 'linear-gradient(135deg, #F5F3E9 0%, #E8E6DC 100%)'}
                     logoSize={brandPage.heroConfig?.logoSize || 400}
+                    heroTextColor={brandPage.heroConfig?.heroTextColor}
                 />
             )}
 

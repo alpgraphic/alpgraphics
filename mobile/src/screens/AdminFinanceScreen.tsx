@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,37 +7,38 @@ import {
     TouchableOpacity,
     RefreshControl,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS, API_BASE_URL } from '../lib/constants';
+import { apiRequest } from '../lib/auth';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
 };
 
+interface Transaction {
+    id: string;
+    accountId: string;
+    type: 'Debt' | 'Payment';
+    amount: number;
+    description: string;
+    date: string;
+    accountName?: string;
+}
+
 export default function AdminFinanceScreen({ navigation }: Props) {
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'expenses'>('overview');
     const [rates, setRates] = useState({ USD: 34.85, EUR: 37.50 });
-
-    const stats = {
-        revenue: 247500,
-        expenses: 85000,
-        profit: 162500,
-        pending: 45000,
-    };
-
-    const invoices = [
-        { id: 1, client: 'Tech Start A.Ş.', amount: 75000, status: 'Paid', date: '10 Oca' },
-        { id: 2, client: 'Design Co', amount: 2500, status: 'Pending', date: '12 Oca', currency: 'USD' },
-        { id: 3, client: 'Startup Labs', amount: 45000, status: 'Overdue', date: '5 Oca' },
-    ];
-
-    const expenses = [
-        { id: 1, title: 'Adobe CC', amount: 1200, category: 'Software' },
-        { id: 2, title: 'Ofis Kirası', amount: 25000, category: 'Rent' },
-        { id: 3, title: 'Freelancer', amount: 15000, category: 'Salaries' },
-    ];
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [stats, setStats] = useState({
+        revenue: 0,
+        expenses: 0,
+        profit: 0,
+        pending: 0,
+    });
 
     const fetchRates = async () => {
         try {
@@ -49,15 +50,47 @@ export default function AdminFinanceScreen({ navigation }: Props) {
         }
     };
 
+    const loadFinanceData = useCallback(async () => {
+        try {
+            const [txResult, dashResult] = await Promise.all([
+                apiRequest<{ data: Transaction[] }>('/api/mobile/transactions'),
+                apiRequest<{ data: { stats: any } }>('/api/mobile/dashboard'),
+            ]);
+
+            if (txResult.success && txResult.data?.data) {
+                setTransactions(txResult.data.data);
+            }
+
+            if (dashResult.success && dashResult.data?.data?.stats) {
+                const s = dashResult.data.data.stats;
+                setStats({
+                    revenue: s.totalRevenue || 0,
+                    expenses: s.totalExpenses || 0,
+                    profit: s.profit || 0,
+                    pending: s.pendingPayments || 0,
+                });
+            }
+        } catch (error) {
+            console.log('Finance data fetch failed');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchRates();
-    }, []);
+        loadFinanceData();
+    }, [loadFinanceData]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchRates();
+        await Promise.all([fetchRates(), loadFinanceData()]);
         setRefreshing(false);
     };
+
+    // Derived data
+    const payments = transactions.filter(t => t.type === 'Payment');
+    const debts = transactions.filter(t => t.type === 'Debt');
 
     const getStatusStyle = (status: string) => {
         switch (status) {
@@ -112,19 +145,25 @@ export default function AdminFinanceScreen({ navigation }: Props) {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 showsVerticalScrollIndicator={false}
             >
+                {loading ? (
+                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                        <ActivityIndicator color={COLORS.primary} size="large" />
+                    </View>
+                ) : (
+                <>
                 {activeTab === 'overview' && (
                     <>
                         <View style={styles.statRow}>
                             <View style={styles.statCard}>
                                 <Text style={styles.statLabel}>Gelir</Text>
                                 <Text style={[styles.statValue, { color: COLORS.success }]}>
-                                    ₺{(stats.revenue / 1000).toFixed(0)}K
+                                    ₺{stats.revenue >= 1000 ? `${(stats.revenue / 1000).toFixed(0)}K` : stats.revenue.toFixed(0)}
                                 </Text>
                             </View>
                             <View style={styles.statCard}>
                                 <Text style={styles.statLabel}>Gider</Text>
                                 <Text style={[styles.statValue, { color: COLORS.error }]}>
-                                    ₺{(stats.expenses / 1000).toFixed(0)}K
+                                    ₺{stats.expenses >= 1000 ? `${(stats.expenses / 1000).toFixed(0)}K` : stats.expenses.toFixed(0)}
                                 </Text>
                             </View>
                         </View>
@@ -141,43 +180,53 @@ export default function AdminFinanceScreen({ navigation }: Props) {
 
                 {activeTab === 'invoices' && (
                     <>
-                        {invoices.map(inv => {
-                            const style = getStatusStyle(inv.status);
-                            return (
-                                <View key={inv.id} style={styles.invoiceCard}>
+                        {payments.length === 0 ? (
+                            <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz ödeme yok</Text>
+                            </View>
+                        ) : (
+                            payments.map(tx => (
+                                <View key={tx.id} style={styles.invoiceCard}>
                                     <View style={styles.invoiceLeft}>
-                                        <Text style={styles.invoiceClient}>{inv.client}</Text>
-                                        <Text style={styles.invoiceDate}>{inv.date}</Text>
+                                        <Text style={styles.invoiceClient}>{tx.description || 'Ödeme'}</Text>
+                                        <Text style={styles.invoiceDate}>
+                                            {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                        </Text>
                                     </View>
                                     <View style={styles.invoiceRight}>
-                                        <Text style={styles.invoiceAmount}>
-                                            {inv.currency === 'USD' ? '$' : '₺'}{inv.amount.toLocaleString()}
-                                        </Text>
-                                        <View style={[styles.invoiceStatus, { backgroundColor: style.bg }]}>
-                                            <Text style={[styles.invoiceStatusText, { color: style.text }]}>
-                                                {inv.status === 'Paid' ? 'Ödendi' :
-                                                    inv.status === 'Pending' ? 'Bekliyor' : 'Gecikmiş'}
-                                            </Text>
+                                        <Text style={styles.invoiceAmount}>₺{tx.amount.toLocaleString()}</Text>
+                                        <View style={[styles.invoiceStatus, { backgroundColor: COLORS.successLight }]}>
+                                            <Text style={[styles.invoiceStatusText, { color: COLORS.success }]}>Ödendi</Text>
                                         </View>
                                     </View>
                                 </View>
-                            );
-                        })}
+                            ))
+                        )}
                     </>
                 )}
 
                 {activeTab === 'expenses' && (
                     <>
-                        {expenses.map(exp => (
-                            <View key={exp.id} style={styles.expenseCard}>
-                                <View>
-                                    <Text style={styles.expenseTitle}>{exp.title}</Text>
-                                    <Text style={styles.expenseCategory}>{exp.category}</Text>
-                                </View>
-                                <Text style={styles.expenseAmount}>-₺{exp.amount.toLocaleString()}</Text>
+                        {debts.length === 0 ? (
+                            <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz gider yok</Text>
                             </View>
-                        ))}
+                        ) : (
+                            debts.map(tx => (
+                                <View key={tx.id} style={styles.expenseCard}>
+                                    <View>
+                                        <Text style={styles.expenseTitle}>{tx.description || 'Borç'}</Text>
+                                        <Text style={styles.expenseCategory}>
+                                            {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.expenseAmount}>-₺{tx.amount.toLocaleString()}</Text>
+                                </View>
+                            ))
+                        )}
                     </>
+                )}
+                </>
                 )}
 
                 <View style={{ height: 40 }} />

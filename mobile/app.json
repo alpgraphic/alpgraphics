@@ -15,8 +15,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.alpgraphics.client",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Hızlı giriş için Face ID kullanın"
+        "NSFaceIDUsageDescription": "Hizli giris icin Face ID kullanin"
       }
     },
     "android": {
@@ -25,6 +26,7 @@
         "backgroundColor": "#f5f3e9"
       },
       "package": "com.alpgraphics.client",
+      "versionCode": 1,
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT"
@@ -37,10 +39,15 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Hızlı giriş için Face ID kullanın"
+          "faceIDPermission": "Hizli giris icin Face ID kullanin"
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
   }
 }

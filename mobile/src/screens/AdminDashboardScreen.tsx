@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -9,11 +9,12 @@ import {
     Alert,
     Dimensions,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
-import { logout } from '../lib/auth';
+import { logout, apiRequest } from '../lib/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -21,28 +22,98 @@ type Props = {
     navigation: NativeStackNavigationProp<any>;
 };
 
+interface DashboardStats {
+    totalAccounts: number;
+    totalProjects: number;
+    pendingBriefs: number;
+    activeBriefs: number;
+    totalRevenue: number;
+    totalExpenses: number;
+    profit: number;
+    pendingPayments: number;
+}
+
+interface ActivityItem {
+    id: string;
+    type: string;
+    amount: number;
+    description: string;
+    date: string;
+    accountName: string;
+}
+
 export default function AdminDashboardScreen({ navigation }: Props) {
     const insets = useSafeAreaInsets();
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<DashboardStats>({
+        totalAccounts: 0,
+        totalProjects: 0,
+        pendingBriefs: 0,
+        activeBriefs: 0,
+        totalRevenue: 0,
+        totalExpenses: 0,
+        profit: 0,
+        pendingPayments: 0,
+    });
+    const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
-    const stats = {
-        accounts: 12,
-        pending: 3,
-        active: 5,
-        revenue: '247.5K',
-    };
+    const loadDashboard = useCallback(async () => {
+        try {
+            const result = await apiRequest<{ data: { stats: DashboardStats; recentActivity: ActivityItem[] } }>(
+                '/api/mobile/dashboard'
+            );
+            if (result.success && result.data?.data) {
+                setStats(result.data.data.stats);
+                setRecentActivity(result.data.data.recentActivity || []);
+            }
+        } catch (error) {
+            console.log('Dashboard fetch failed');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await loadDashboard();
         setRefreshing(false);
     };
 
     const handleLogout = () => {
         Alert.alert('', 'Çıkış yapmak istiyor musunuz?', [
             { text: 'İptal', style: 'cancel' },
-            { text: 'Çıkış', style: 'destructive', onPress: () => navigation.replace('Login') },
+            {
+                text: 'Çıkış',
+                style: 'destructive',
+                onPress: async () => {
+                    await logout();
+                    navigation.replace('Login');
+                },
+            },
         ]);
+    };
+
+    const formatCurrency = (value: number): string => {
+        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+        return value.toFixed(0);
+    };
+
+    const formatActivityTime = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffHours < 1) return 'az önce';
+        if (diffHours < 24) return `${diffHours}s`;
+        if (diffDays < 7) return `${diffDays}g`;
+        return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
     };
 
     return (
@@ -74,12 +145,18 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                 }
                 showsVerticalScrollIndicator={false}
             >
+                {loading ? (
+                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                        <ActivityIndicator color={COLORS.primary} size="large" />
+                    </View>
+                ) : (
+                <>
                 {/* Hero Stats Section */}
                 <View style={styles.heroSection}>
                     <Text style={styles.heroLabel}>TOPLAM GELİR</Text>
                     <View style={styles.heroRow}>
                         <Text style={styles.heroCurrency}>₺</Text>
-                        <Text style={styles.heroValue}>{stats.revenue}</Text>
+                        <Text style={styles.heroValue}>{formatCurrency(stats.totalRevenue)}</Text>
                     </View>
                     <View style={styles.heroLine} />
                 </View>
@@ -87,18 +164,18 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                 {/* Stats Grid */}
                 <View style={styles.statsContainer}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.accounts}</Text>
+                        <Text style={styles.statNumber}>{stats.totalAccounts}</Text>
                         <Text style={styles.statLabel}>Hesap</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={[styles.statNumber, styles.statAccent]}>{stats.pending}</Text>
+                        <Text style={[styles.statNumber, styles.statAccent]}>{stats.pendingBriefs}</Text>
                         <Text style={styles.statLabel}>Bekleyen</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.active}</Text>
-                        <Text style={styles.statLabel}>Aktif</Text>
+                        <Text style={styles.statNumber}>{stats.totalProjects}</Text>
+                        <Text style={styles.statLabel}>Proje</Text>
                     </View>
                 </View>
 
@@ -125,9 +202,9 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                             <Text style={styles.cardTitle}>Briefler</Text>
                             <Text style={styles.cardSub}>İncele ve onayla</Text>
                         </View>
-                        {stats.pending > 0 && (
+                        {stats.pendingBriefs > 0 && (
                             <View style={styles.cardBadge}>
-                                <Text style={styles.cardBadgeText}>{stats.pending}</Text>
+                                <Text style={styles.cardBadgeText}>{stats.pendingBriefs}</Text>
                             </View>
                         )}
                         <Text style={styles.cardArrow}>→</Text>
@@ -150,18 +227,24 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                 <View style={styles.activitySection}>
                     <Text style={styles.sectionTitle}>Son Hareketler</Text>
 
-                    {[
-                        { text: 'Tech Start A.Ş. brief gönderdi', time: '2s' },
-                        { text: 'Yeni hesap oluşturuldu', time: '5s' },
-                        { text: 'Ödeme alındı — ₺45.000', time: 'dün' },
-                    ].map((item, index) => (
-                        <View key={index} style={styles.activityRow}>
-                            <View style={styles.activityDot} />
-                            <Text style={styles.activityText}>{item.text}</Text>
-                            <Text style={styles.activityTime}>{item.time}</Text>
-                        </View>
-                    ))}
+                    {recentActivity.length === 0 ? (
+                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, textAlign: 'center', padding: SPACING.md }}>
+                            Henüz hareket yok
+                        </Text>
+                    ) : (
+                        recentActivity.map((item, index) => (
+                            <View key={item.id || index} style={styles.activityRow}>
+                                <View style={styles.activityDot} />
+                                <Text style={styles.activityText}>
+                                    {item.accountName} — {item.type === 'Payment' ? 'Ödeme' : 'Borç'} ₺{item.amount?.toLocaleString()}
+                                </Text>
+                                <Text style={styles.activityTime}>{formatActivityTime(item.date)}</Text>
+                            </View>
+                        ))
+                    )}
                 </View>
+                </>
+                )}
             </ScrollView>
         </View>
     );

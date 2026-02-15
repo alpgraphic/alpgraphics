@@ -10,11 +10,18 @@ export interface AuthTokens {
 }
 
 export interface UserData {
-    id: number;
+    id: string;
     email: string;
     name: string;
     company: string;
     role: 'admin' | 'client';
+}
+
+export interface LoginResult {
+    success: boolean;
+    requires2FA?: boolean;
+    adminId?: string;
+    error?: string;
 }
 
 // Secure Storage
@@ -35,7 +42,7 @@ export async function login(
     email: string,
     password: string,
     role: 'admin' | 'client'
-): Promise<{ success: boolean; error?: string }> {
+): Promise<LoginResult> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/mobile/auth`, {
             method: 'POST',
@@ -45,27 +52,98 @@ export async function login(
 
         const data = await response.json();
 
+        // Admin 2FA required
+        if (data.success && data.requires2FA) {
+            return {
+                success: false,
+                requires2FA: true,
+                adminId: data.adminId,
+            };
+        }
+
+        // Direct login (client or admin without 2FA)
         if (data.success && data.accessToken) {
             await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
             await storage.set(TOKEN_KEYS.REFRESH_TOKEN, data.refreshToken);
+            if (data.account) {
+                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({
+                    role,
+                    ...data.account,
+                }));
+            }
             return { success: true };
         }
 
-        return { success: false, error: data.error || 'Giriş başarısız' };
+        return { success: false, error: data.error || 'Giris basarisiz' };
     } catch (error) {
-        return { success: false, error: 'Bağlantı hatası' };
+        return { success: false, error: 'Baglanti hatasi' };
+    }
+}
+
+// Verify 2FA code for admin
+export async function verify2FA(
+    adminId: string,
+    code: string
+): Promise<LoginResult> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/mobile/auth/verify-2fa`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminId, code }),
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.accessToken) {
+            await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
+            await storage.set(TOKEN_KEYS.REFRESH_TOKEN, data.refreshToken);
+            if (data.account) {
+                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({
+                    role: 'admin',
+                    ...data.account,
+                }));
+            }
+            return { success: true };
+        }
+
+        return { success: false, error: data.error || 'Dogrulama basarisiz' };
+    } catch (error) {
+        return { success: false, error: 'Baglanti hatasi' };
     }
 }
 
 export async function logout(): Promise<void> {
-    await storage.delete(TOKEN_KEYS.ACCESS_TOKEN);
-    await storage.delete(TOKEN_KEYS.REFRESH_TOKEN);
-    await storage.delete(TOKEN_KEYS.USER_DATA);
+    try {
+        const accessToken = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
+        if (accessToken) {
+            // Notify server to destroy session
+            await fetch(`${API_BASE_URL}/api/mobile/auth`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }).catch(() => {});
+        }
+    } finally {
+        await storage.delete(TOKEN_KEYS.ACCESS_TOKEN);
+        await storage.delete(TOKEN_KEYS.REFRESH_TOKEN);
+        await storage.delete(TOKEN_KEYS.USER_DATA);
+    }
 }
 
 export async function isAuthenticated(): Promise<boolean> {
     const token = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
     return !!token;
+}
+
+export async function getUserData(): Promise<UserData | null> {
+    const data = await storage.get(TOKEN_KEYS.USER_DATA);
+    if (!data) return null;
+    try {
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
 }
 
 // Biometric Auth
@@ -76,12 +154,12 @@ export async function isBiometricAvailable(): Promise<boolean> {
 }
 
 export async function authenticateWithBiometric(
-    promptMessage: string = 'Kimliğinizi doğrulayın'
+    promptMessage: string = 'Kimliginizi dogrulayin'
 ): Promise<boolean> {
     const result = await LocalAuthentication.authenticateAsync({
         promptMessage,
-        fallbackLabel: 'Şifre ile giriş',
-        cancelLabel: 'İptal',
+        fallbackLabel: 'Sifre ile giris',
+        cancelLabel: 'Iptal',
     });
     return result.success;
 }
@@ -106,6 +184,6 @@ export async function apiRequest<T>(
         const data = await response.json();
         return { success: response.ok, data, error: data.error };
     } catch (error) {
-        return { success: false, error: 'Bağlantı hatası' };
+        return { success: false, error: 'Baglanti hatasi' };
     }
 }

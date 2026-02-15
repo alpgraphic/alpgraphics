@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     response.headers.set(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https://www.tcmb.gov.tr https://*.mongodb.net; frame-ancestors 'none';"
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors 'none';"
     );
 
     // ─── ORIGIN CHECK (CSRF Protection via Origin/Referer) ───
@@ -85,8 +85,8 @@ export function middleware(request: NextRequest) {
             return res;
         }
 
-        // Token format validation
-        if (sessionToken.length < 32) {
+        // Token format validation (must be 64 hex chars)
+        if (!/^[a-f0-9]{64}$/.test(sessionToken)) {
             const res = NextResponse.redirect(new URL('/login', request.url));
             res.cookies.delete('session_token');
             res.cookies.delete('user_role');
