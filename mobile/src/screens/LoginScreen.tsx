@@ -15,9 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS, TOKEN_KEYS } from '../lib/constants';
 import { login, storage } from '../lib/auth';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = {
-    navigation: NativeStackNavigationProp<any>;
+    navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
 export default function LoginScreen({ navigation }: Props) {
@@ -50,7 +51,10 @@ export default function LoginScreen({ navigation }: Props) {
         try {
             const result = await login(trimmedEmail, password, role);
 
-            if (result.success) {
+            if (result.requires2FA && result.adminId) {
+                // Navigate to 2FA screen
+                navigation.navigate('TwoFactor', { adminId: result.adminId });
+            } else if (result.success) {
                 await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role }));
 
                 if (role === 'admin') {
@@ -59,7 +63,7 @@ export default function LoginScreen({ navigation }: Props) {
                     navigation.replace('Dashboard');
                 }
             } else {
-                Alert.alert('Giriş Başarısız', result.error || 'E-posta veya şifre hatalı');
+                Alert.alert('Giris Basarisiz', result.error || 'E-posta veya sifre hatali');
             }
         } catch (error) {
             Alert.alert('Hata', 'Bağlantı hatası. Lütfen tekrar deneyin.');
