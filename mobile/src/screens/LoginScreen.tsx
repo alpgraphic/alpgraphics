@@ -47,17 +47,16 @@ export default function LoginScreen({ navigation }: Props) {
         }
 
         setIsLoading(true);
+        // Capture role at start to prevent race condition if user changes role during async login
+        const currentRole = role;
 
         try {
-            const result = await login(trimmedEmail, password, role);
+            const result = await login(trimmedEmail, password, currentRole);
 
             if (result.requires2FA && result.adminId) {
-                // Navigate to 2FA screen
                 navigation.navigate('TwoFactor', { adminId: result.adminId });
             } else if (result.success) {
-                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role }));
-
-                if (role === 'admin') {
+                if (currentRole === 'admin') {
                     navigation.replace('AdminDashboard');
                 } else {
                     navigation.replace('Dashboard');

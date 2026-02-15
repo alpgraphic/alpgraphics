@@ -37,6 +37,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Email, password ve role gereklidir' }, { status: 400 });
         }
 
+        // Validate role against whitelist
+        if (!['admin', 'client'].includes(role)) {
+            return NextResponse.json({ error: INVALID_CREDENTIALS_MSG }, { status: 401 });
+        }
+
         // Validate email format to prevent injection
         const emailStr = String(email).toLowerCase().trim();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {

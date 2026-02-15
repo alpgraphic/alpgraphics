@@ -44,10 +44,18 @@ export async function DELETE(request: NextRequest) {
             );
         }
 
-        // Validate URL belongs to our Vercel Blob store
-        if (!url.includes('vercel-storage.com') && !url.includes('blob.vercel-storage.com')) {
+        // Validate URL belongs to our Vercel Blob store (proper hostname check)
+        try {
+            const parsed = new URL(url);
+            if (!parsed.hostname.endsWith('.vercel-storage.com') && parsed.hostname !== 'vercel-storage.com') {
+                return NextResponse.json(
+                    { success: false, error: 'Invalid storage URL' },
+                    { status: 400 }
+                );
+            }
+        } catch {
             return NextResponse.json(
-                { success: false, error: 'Invalid storage URL' },
+                { success: false, error: 'Invalid URL format' },
                 { status: 400 }
             );
         }

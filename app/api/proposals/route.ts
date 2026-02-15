@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest) {
             );
         }
         if (!result || result.matchedCount === 0) {
-            const numericId = typeof id === 'number' ? id : parseInt(id);
+            const numericId = typeof id === 'number' ? id : parseInt(id, 10);
             if (!isNaN(numericId)) {
                 result = await collection.updateOne(
                     { id: numericId },
@@ -162,7 +162,7 @@ export async function DELETE(request: NextRequest) {
 
         // If not found, try numeric ID
         if (!result || result.deletedCount === 0) {
-            const numericId = parseInt(id);
+            const numericId = parseInt(id, 10);
             if (!isNaN(numericId)) {
                 result = await collection.deleteOne({ id: numericId });
             }

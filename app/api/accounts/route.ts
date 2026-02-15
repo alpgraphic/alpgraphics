@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
 
         if (existing) {
             return NextResponse.json(
-                { error: 'Bu e-posta adresi zaten kullanımda' },
-                { status: 409 }
+                { error: 'Hesap olusturulamadi' },
+                { status: 400 }
             );
         }
 

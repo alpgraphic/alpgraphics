@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -11,7 +11,7 @@ import AdminAccountsScreen from '../screens/AdminAccountsScreen';
 import AdminBriefsScreen from '../screens/AdminBriefsScreen';
 import AdminFinanceScreen from '../screens/AdminFinanceScreen';
 
-import { isAuthenticated, getUserData } from '../lib/auth';
+import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
 
 export type RootStackParamList = {
@@ -38,6 +38,7 @@ function LoadingScreen() {
 export default function AppNavigator() {
     const [isReady, setIsReady] = useState(false);
     const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
+    const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -59,10 +60,34 @@ export default function AppNavigator() {
         checkAuth();
     }, []);
 
+    // Handle session expiry — redirect to login
+    useEffect(() => {
+        setSessionExpiredHandler(() => {
+            Alert.alert(
+                'Oturum Suresi Doldu',
+                'Lutfen tekrar giris yapin.',
+                [{
+                    text: 'Tamam',
+                    onPress: async () => {
+                        await logout();
+                        if (navigationRef.current) {
+                            navigationRef.current.reset({
+                                index: 0,
+                                routes: [{ name: 'Login' }],
+                            });
+                        }
+                    },
+                }]
+            );
+        });
+
+        return () => setSessionExpiredHandler(() => {});
+    }, []);
+
     if (!isReady) return <LoadingScreen />;
 
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             <Stack.Navigator
                 initialRouteName={initialRoute}
                 screenOptions={{

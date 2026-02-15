@@ -20,7 +20,7 @@ export async function GET(
 
         // Then try by numeric id
         if (!project) {
-            const numericId = parseInt(id);
+            const numericId = parseInt(id, 10);
             if (!isNaN(numericId)) {
                 project = await collection.findOne({ id: numericId });
             }

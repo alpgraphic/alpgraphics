@@ -24,7 +24,7 @@ export async function GET(
 
         if (!project) {
             // Try numeric ID
-            const numericId = parseInt(id);
+            const numericId = parseInt(id, 10);
             if (!isNaN(numericId)) {
                 project = await collection.findOne({ id: numericId });
             }
@@ -90,7 +90,7 @@ export async function PUT(
 
         // If not found, try numeric ID
         if (!result || result.matchedCount === 0) {
-            const numericId = parseInt(id);
+            const numericId = parseInt(id, 10);
             if (!isNaN(numericId)) {
                 result = await collection.updateOne(
                     { id: numericId },
@@ -133,7 +133,7 @@ export async function DELETE(
 
         // If not found, try numeric ID
         if (!result || result.deletedCount === 0) {
-            const numericId = parseInt(id);
+            const numericId = parseInt(id, 10);
             if (!isNaN(numericId)) {
                 result = await collection.deleteOne({ id: numericId });
             }

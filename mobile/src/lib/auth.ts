@@ -27,15 +27,50 @@ export interface LoginResult {
 // Secure Storage
 export const storage = {
     async get(key: string): Promise<string | null> {
-        return SecureStore.getItemAsync(key);
+        try {
+            return await SecureStore.getItemAsync(key);
+        } catch {
+            return null;
+        }
     },
     async set(key: string, value: string): Promise<void> {
         await SecureStore.setItemAsync(key, value);
     },
     async delete(key: string): Promise<void> {
-        await SecureStore.deleteItemAsync(key);
+        try {
+            await SecureStore.deleteItemAsync(key);
+        } catch {
+            // Ignore delete errors
+        }
     },
 };
+
+// Fetch with timeout
+async function fetchWithTimeout(
+    url: string,
+    options: RequestInit = {},
+    timeoutMs: number = 15000
+): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+        });
+        return response;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+// Navigation callback for session expiry
+let onSessionExpired: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: () => void) {
+    onSessionExpired = handler;
+}
 
 // Auth Functions
 export async function login(
@@ -44,7 +79,7 @@ export async function login(
     role: 'admin' | 'client'
 ): Promise<LoginResult> {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/mobile/auth`, {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, role }),
@@ -61,8 +96,8 @@ export async function login(
             };
         }
 
-        // Direct login (client or admin without 2FA)
-        if (data.success && data.accessToken) {
+        // Direct login success - validate response has tokens
+        if (data.success && data.accessToken && data.refreshToken) {
             await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
             await storage.set(TOKEN_KEYS.REFRESH_TOKEN, data.refreshToken);
             if (data.account) {
@@ -70,12 +105,17 @@ export async function login(
                     role,
                     ...data.account,
                 }));
+            } else {
+                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role }));
             }
             return { success: true };
         }
 
         return { success: false, error: data.error || 'Giris basarisiz' };
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            return { success: false, error: 'Baglanti zaman asimina ugradi' };
+        }
         return { success: false, error: 'Baglanti hatasi' };
     }
 }
@@ -86,7 +126,7 @@ export async function verify2FA(
     code: string
 ): Promise<LoginResult> {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/mobile/auth/verify-2fa`, {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth/verify-2fa`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ adminId, code }),
@@ -94,21 +134,49 @@ export async function verify2FA(
 
         const data = await response.json();
 
-        if (data.success && data.accessToken) {
+        if (data.success && data.accessToken && data.refreshToken) {
             await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
             await storage.set(TOKEN_KEYS.REFRESH_TOKEN, data.refreshToken);
-            if (data.account) {
-                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({
-                    role: 'admin',
-                    ...data.account,
-                }));
-            }
+            await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({
+                role: 'admin',
+                ...(data.account || {}),
+            }));
             return { success: true };
         }
 
         return { success: false, error: data.error || 'Dogrulama basarisiz' };
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            return { success: false, error: 'Baglanti zaman asimina ugradi' };
+        }
         return { success: false, error: 'Baglanti hatasi' };
+    }
+}
+
+// Refresh access token using refresh token
+async function refreshAccessToken(): Promise<boolean> {
+    try {
+        const refreshToken = await storage.get(TOKEN_KEYS.REFRESH_TOKEN);
+        if (!refreshToken) return false;
+
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${refreshToken}`,
+            },
+        }, 10000);
+
+        const data = await response.json();
+
+        if (data.success && data.accessToken) {
+            await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
+            return true;
+        }
+
+        return false;
+    } catch {
+        return false;
     }
 }
 
@@ -116,13 +184,12 @@ export async function logout(): Promise<void> {
     try {
         const accessToken = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
         if (accessToken) {
-            // Notify server to destroy session
-            await fetch(`${API_BASE_URL}/api/mobile/auth`, {
+            await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                 },
-            }).catch(() => {});
+            }, 5000).catch(() => {});
         }
     } finally {
         await storage.delete(TOKEN_KEYS.ACCESS_TOKEN);
@@ -140,7 +207,12 @@ export async function getUserData(): Promise<UserData | null> {
     const data = await storage.get(TOKEN_KEYS.USER_DATA);
     if (!data) return null;
     try {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // Validate structure
+        if (parsed && typeof parsed === 'object' && parsed.role) {
+            return parsed as UserData;
+        }
+        return null;
     } catch {
         return null;
     }
@@ -148,9 +220,13 @@ export async function getUserData(): Promise<UserData | null> {
 
 // Biometric Auth
 export async function isBiometricAvailable(): Promise<boolean> {
-    const hasHardware = await LocalAuthentication.hasHardwareAsync();
-    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-    return hasHardware && isEnrolled;
+    try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        return hasHardware && isEnrolled;
+    } catch {
+        return false;
+    }
 }
 
 export async function authenticateWithBiometric(
@@ -164,15 +240,21 @@ export async function authenticateWithBiometric(
     return result.success;
 }
 
-// API Request with Auth
+// API Request with Auth + Auto Token Refresh
 export async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; error?: string }> {
     const accessToken = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
 
+    // No token at all — session expired
+    if (!accessToken) {
+        onSessionExpired?.();
+        return { success: false, error: 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' };
+    }
+
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        const response = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
@@ -181,9 +263,38 @@ export async function apiRequest<T>(
             },
         });
 
+        // Token expired — try refresh
+        if (response.status === 401) {
+            const refreshed = await refreshAccessToken();
+            if (refreshed) {
+                // Retry with new token
+                const newToken = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
+                const retryResponse = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${newToken}`,
+                        ...options.headers,
+                    },
+                });
+                const retryData = await retryResponse.json();
+                return { success: retryResponse.ok, data: retryData, error: retryData.error };
+            }
+
+            // Refresh also failed — session fully expired
+            await storage.delete(TOKEN_KEYS.ACCESS_TOKEN);
+            await storage.delete(TOKEN_KEYS.REFRESH_TOKEN);
+            await storage.delete(TOKEN_KEYS.USER_DATA);
+            onSessionExpired?.();
+            return { success: false, error: 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' };
+        }
+
         const data = await response.json();
-        return { success: response.ok, data, error: data.error };
-    } catch (error) {
+        return { success: response.ok, data, error: data?.error };
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            return { success: false, error: 'Istek zaman asimina ugradi' };
+        }
         return { success: false, error: 'Baglanti hatasi' };
     }
 }
