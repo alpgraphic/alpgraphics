@@ -132,7 +132,22 @@ export interface DbProposal {
         unitPrice: number;
     }>;
     logoText?: string;
+    logoSubtext?: string;
+    logoUrl?: string;
     primaryColor?: string;
+    currencySymbol?: string;
+    taxRate?: number;
+    attnText?: string;
+    preparedForLabel?: string;
+    projectLabel?: string;
+    footerName?: string;
+    footerTitle?: string;
+    footerNote?: string;
+    website?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    notes?: string;
     createdAt: Date;
     updatedAt: Date;
 }

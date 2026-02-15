@@ -340,6 +340,8 @@ export interface Proposal {
     taxRate?: number; // e.g. 20
     logoText?: string;
     logoSubtext?: string;
+    logoUrl?: string; // URL or base64 for uploaded logo image
+    primaryColor?: string; // e.g. "#a62932"
     attnText?: string; // e.g. "Attn: Project Manager"
     preparedForLabel?: string;
     projectLabel?: string;
@@ -347,6 +349,10 @@ export interface Proposal {
     footerTitle?: string;
     footerNote?: string;
     website?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    notes?: string; // Additional terms/notes at end
 }
 
 const INITIAL_PROPOSALS: Proposal[] = [];

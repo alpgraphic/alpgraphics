@@ -1662,359 +1662,399 @@ export default function AdminDashboard() {
 
                 {/* PROPOSAL EDITOR MODAL */}
                 {/* SPLIT-SCREEN LIVE PROPOSAL STUDIO (WYSIWYG) */}
-                {editingProposal && (
+                {editingProposal && (() => {
+                    const epc = editingProposal.primaryColor || '#a62932';
+                    const ecs = editingProposal.currencySymbol || '₺';
+                    const eTaxRate = editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20;
+                    const eSubtotal = (editingProposal.items || []).reduce((sum: number, i: { quantity: number; unitPrice: number }) => sum + i.quantity * i.unitPrice, 0) || editingProposal.totalAmount;
+                    const eTax = eSubtotal * (eTaxRate / 100);
+                    const eTotal = eSubtotal + eTax;
+                    const eFmt = (n: number) => `${ecs}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            setEditingProposal({ ...editingProposal, logoUrl: ev.target?.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                    };
+
+                    return (
                     <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col md:flex-row h-screen w-screen overflow-hidden">
 
-                        {/* LEFT COLUMN: EDITOR PANEL (40%) */}
-                        <div className={`w-full md:w-[400px] lg:w-[450px] shadow-2xl flex flex-col h-full border-r ${isAdminNight ? 'bg-[#0a0a0a] border-white/10' : 'bg-white border-black/10'}`}>
-                            <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                                <h3 className="font-bold text-lg flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                    Live Editor
-                                </h3>
+                        {/* LEFT COLUMN: EDITOR PANEL */}
+                        <div className={`w-full md:w-[420px] lg:w-[460px] shadow-2xl flex flex-col h-full border-r ${isAdminNight ? 'bg-[#0a0a0a] border-white/10' : 'bg-white border-black/10'}`}>
+                            <div className="px-6 py-5 border-b flex justify-between items-center" style={{ borderColor: isAdminNight ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: epc + '20' }}>
+                                        <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: epc }} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-sm">Teklif Studio</h3>
+                                        <p className="text-[10px] opacity-40">Canli Onizleme</p>
+                                    </div>
+                                </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => window.print()} className="bg-white/10 p-2 rounded hover:bg-white/20" title="Print Now">🖨️</button>
-                                    <button onClick={() => {
-                                        updateProposal(editingProposal.id, editingProposal);
-                                        setEditingProposal(null);
-                                    }} className="text-sm font-bold opacity-50 hover:opacity-100">CLOSE</button>
+                                    <button onClick={() => setPrintingProposal(editingProposal)} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors" title="Yazdir">
+                                        <svg className="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                    </button>
+                                    <button onClick={() => { updateProposal(editingProposal.id, editingProposal); setEditingProposal(null); }}
+                                        className="text-xs font-bold opacity-40 hover:opacity-100 px-3 py-1 rounded-lg hover:bg-black/5 transition-all">KAPAT</button>
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                                {/* BRANDING SECTION */}
-                                <div className="space-y-4 border-b border-white/10 pb-6">
-                                    <h4 className="text-xs font-bold uppercase tracking-widest opacity-50">Branding & Labels</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Company Name (Logo)</label>
-                                            <input
-                                                value={editingProposal.logoText || 'AGENCY.OS'}
-                                                onChange={e => setEditingProposal({ ...editingProposal, logoText: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
+                            <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+                                {/* BRANDING */}
+                                <div className={`space-y-4 p-4 rounded-2xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                                        Marka & Logo
+                                    </h4>
+
+                                    {/* Logo Upload */}
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-16 h-16 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer relative group ${isAdminNight ? 'border-white/10 hover:border-white/30' : 'border-black/10 hover:border-black/30'}`}>
+                                            {editingProposal.logoUrl ? (
+                                                <>
+                                                    <img src={editingProposal.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                                                    <button onClick={() => setEditingProposal({ ...editingProposal, logoUrl: undefined })}
+                                                        className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-bold">
+                                                        Kaldir
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                                                    <svg className="w-5 h-5 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                                                </label>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Slogan (Subtext)</label>
-                                            <input
-                                                value={editingProposal.logoSubtext || 'Creative Digital Solutions'}
-                                                onChange={e => setEditingProposal({ ...editingProposal, logoSubtext: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Prepared For Label</label>
-                                            <input
-                                                value={editingProposal.preparedForLabel || 'Prepared For'}
-                                                onChange={e => setEditingProposal({ ...editingProposal, preparedForLabel: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Project Label</label>
-                                            <input
-                                                value={editingProposal.projectLabel || 'Project'}
-                                                onChange={e => setEditingProposal({ ...editingProposal, projectLabel: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
+                                        <div className="flex-1 space-y-2">
+                                            <input value={editingProposal.logoText || 'alpgraphics'} onChange={e => setEditingProposal({ ...editingProposal, logoText: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm font-bold focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Sirket Adi" />
+                                            <input value={editingProposal.logoSubtext || ''} onChange={e => setEditingProposal({ ...editingProposal, logoSubtext: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-xs focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Slogan" />
                                         </div>
                                     </div>
-                                </div>
-                                {/* METADATA SECTION */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-bold uppercase tracking-widest opacity-50">Proposal Details</h4>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Proposal Title</label>
-                                        <input
-                                            value={editingProposal.title}
-                                            onChange={e => setEditingProposal({ ...editingProposal, title: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Client Name</label>
-                                            <input
-                                                value={editingProposal.clientName}
-                                                onChange={e => setEditingProposal({ ...editingProposal, clientName: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Valid Until</label>
-                                            <input
-                                                type="date"
-                                                value={editingProposal.validUntil}
-                                                onChange={e => setEditingProposal({ ...editingProposal, validUntil: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Attention Note</label>
-                                        <input
-                                            value={editingProposal.attnText || 'Attn: Project Manager'}
-                                            onChange={e => setEditingProposal({ ...editingProposal, attnText: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Currency Symbol</label>
-                                            <input
-                                                value={editingProposal.currencySymbol || '₺'}
-                                                onChange={e => setEditingProposal({ ...editingProposal, currencySymbol: e.target.value })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] opacity-50 block mb-1">Tax Rate (%)</label>
-                                            <input
-                                                type="number"
-                                                value={editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20}
-                                                onChange={e => setEditingProposal({ ...editingProposal, taxRate: parseFloat(e.target.value) })}
-                                                className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                            />
+
+                                    {/* Color Picker */}
+                                    <div className="flex items-center gap-3">
+                                        <label className="text-[10px] opacity-40 shrink-0">Tema Rengi</label>
+                                        <div className="flex items-center gap-2 flex-1">
+                                            {['#a62932', '#2563eb', '#059669', '#7c3aed', '#ea580c', '#0891b2', '#dc2626', '#1e293b'].map(c => (
+                                                <button key={c} onClick={() => setEditingProposal({ ...editingProposal, primaryColor: c })}
+                                                    className={`w-6 h-6 rounded-full transition-all ${epc === c ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-110'}`}
+                                                    style={{ background: c, ['--tw-ring-color' as string]: c }} />
+                                            ))}
+                                            <input type="color" value={epc} onChange={e => setEditingProposal({ ...editingProposal, primaryColor: e.target.value })}
+                                                className="w-6 h-6 rounded-full cursor-pointer border-0 p-0" title="Ozel Renk" />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* ITEMS SECTION */}
-                                <div className="space-y-4">
+                                {/* PROPOSAL DETAILS */}
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        Teklif Detaylari
+                                    </h4>
+                                    <input value={editingProposal.title} onChange={e => setEditingProposal({ ...editingProposal, title: e.target.value })}
+                                        className={`w-full bg-transparent border-b py-2 font-bold text-lg focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Teklif Basligi" />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Musteri</label>
+                                            <input value={editingProposal.clientName} onChange={e => setEditingProposal({ ...editingProposal, clientName: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Gecerlilik</label>
+                                            <input type="date" value={editingProposal.validUntil} onChange={e => setEditingProposal({ ...editingProposal, validUntil: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} />
+                                        </div>
+                                    </div>
+                                    <input value={editingProposal.attnText || ''} onChange={e => setEditingProposal({ ...editingProposal, attnText: e.target.value })}
+                                        className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none transition-colors ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Ilgili Kisi (orn: Proje Yoneticisi)" />
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Para Birimi</label>
+                                            <select value={editingProposal.currency} onChange={e => {
+                                                const curr = e.target.value as 'TRY' | 'USD' | 'EUR';
+                                                const sym = curr === 'USD' ? '$' : curr === 'EUR' ? '€' : '₺';
+                                                setEditingProposal({ ...editingProposal, currency: curr, currencySymbol: sym });
+                                            }} className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`}>
+                                                <option value="TRY" className="text-black">TRY (₺)</option>
+                                                <option value="USD" className="text-black">USD ($)</option>
+                                                <option value="EUR" className="text-black">EUR</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">KDV (%)</label>
+                                            <input type="number" value={eTaxRate} onChange={e => setEditingProposal({ ...editingProposal, taxRate: parseFloat(e.target.value) })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Durum</label>
+                                            <select value={editingProposal.status} onChange={e => setEditingProposal({ ...editingProposal, status: e.target.value as 'Draft' | 'Sent' | 'Accepted' | 'Rejected' })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`}>
+                                                <option value="Draft" className="text-black">Taslak</option>
+                                                <option value="Sent" className="text-black">Gonderildi</option>
+                                                <option value="Accepted" className="text-black">Onaylandi</option>
+                                                <option value="Rejected" className="text-black">Reddedildi</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* LINE ITEMS */}
+                                <div className="space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <h4 className="text-xs font-bold uppercase tracking-widest opacity-50">Line Items</h4>
-                                        <button
-                                            onClick={() => setEditingProposal({
-                                                ...editingProposal,
-                                                items: [...(editingProposal.items || []), { id: Date.now(), description: "New Service Item", quantity: 1, unitPrice: 0, total: 0 }]
-                                            })}
-                                            className="text-[10px] bg-[#a62932] text-white px-3 py-1 rounded-full font-bold hover:scale-105 transition-transform"
-                                        >
-                                            + ADD ITEM
+                                        <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                            Hizmet Kalemleri
+                                        </h4>
+                                        <button onClick={() => setEditingProposal({
+                                            ...editingProposal,
+                                            items: [...(editingProposal.items || []), { id: Date.now(), description: "Yeni Hizmet", quantity: 1, unitPrice: 0, total: 0 }]
+                                        })} className="text-[10px] text-white px-3 py-1.5 rounded-lg font-bold hover:opacity-90 transition-all" style={{ background: epc }}>
+                                            + Ekle
                                         </button>
                                     </div>
 
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
                                         {(editingProposal.items || []).map((item, index) => (
-                                            <div key={index} className={`p-4 rounded-xl border group ${isAdminNight ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                                            <div key={index} className={`p-3.5 rounded-xl border group transition-all ${isAdminNight ? 'bg-white/[0.03] border-white/5 hover:border-white/10' : 'bg-black/[0.02] border-black/5 hover:border-black/10'}`}>
                                                 <div className="flex justify-between mb-2">
-                                                    <input
-                                                        value={item.description}
-                                                        onChange={e => {
-                                                            const newItems = [...(editingProposal.items || [])];
-                                                            newItems[index].description = e.target.value;
-                                                            setEditingProposal({ ...editingProposal, items: newItems });
-                                                        }}
-                                                        className="bg-transparent font-medium w-full focus:outline-none"
-                                                        placeholder="Item Description"
-                                                    />
-                                                    <button
-                                                        onClick={() => {
-                                                            const newItems = (editingProposal.items || []).filter((_, i) => i !== index);
-                                                            const newTotal = newItems.reduce((sum, i) => sum + i.total, 0);
-                                                            setEditingProposal({ ...editingProposal, items: newItems, totalAmount: newTotal });
-                                                        }}
-                                                        className="opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:text-red-500 transition-all"
-                                                    >
-                                                        ✕
+                                                    <input value={item.description} onChange={e => {
+                                                        const ni = [...(editingProposal.items || [])]; ni[index].description = e.target.value;
+                                                        setEditingProposal({ ...editingProposal, items: ni });
+                                                    }} className="bg-transparent font-medium w-full focus:outline-none text-sm" placeholder="Hizmet Aciklamasi" />
+                                                    <button onClick={() => {
+                                                        const ni = (editingProposal.items || []).filter((_: unknown, i: number) => i !== index);
+                                                        const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
+                                                        setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                    }} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 hover:text-red-500 transition-all ml-2 shrink-0">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                     </button>
                                                 </div>
-                                                <div className="flex gap-4 items-center">
-                                                    <div className="flex-1">
-                                                        <label className="text-[8px] uppercase opacity-50 block">Qty</label>
-                                                        <input
-                                                            type="number"
-                                                            value={item.quantity}
-                                                            onChange={e => {
-                                                                const newItems = [...(editingProposal.items || [])];
-                                                                const qty = parseFloat(e.target.value) || 0;
-                                                                newItems[index].quantity = qty;
-                                                                newItems[index].total = qty * newItems[index].unitPrice;
-                                                                // Calc Total
-                                                                const newTotal = newItems.reduce((sum, i) => sum + i.total, 0);
-                                                                setEditingProposal({ ...editingProposal, items: newItems, totalAmount: newTotal });
-                                                            }}
-                                                            className="w-full bg-transparent border-b border-current/10 py-1 text-sm focus:outline-none"
-                                                        />
+                                                <div className="flex gap-3 items-center">
+                                                    <div className="w-16">
+                                                        <label className="text-[8px] uppercase opacity-40 block">Adet</label>
+                                                        <input type="number" value={item.quantity} onChange={e => {
+                                                            const ni = [...(editingProposal.items || [])]; const q = parseFloat(e.target.value) || 0;
+                                                            ni[index].quantity = q; ni[index].total = q * ni[index].unitPrice;
+                                                            const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
+                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[8px] uppercase opacity-50 block">Unit Price</label>
-                                                        <input
-                                                            type="number"
-                                                            value={item.unitPrice}
-                                                            onChange={e => {
-                                                                const newItems = [...(editingProposal.items || [])];
-                                                                const price = parseFloat(e.target.value) || 0;
-                                                                newItems[index].unitPrice = price;
-                                                                newItems[index].total = newItems[index].quantity * price;
-                                                                // Calc Total
-                                                                const newTotal = newItems.reduce((sum, i) => sum + i.total, 0);
-                                                                setEditingProposal({ ...editingProposal, items: newItems, totalAmount: newTotal });
-                                                            }}
-                                                            className="w-full bg-transparent border-b border-current/10 py-1 text-sm focus:outline-none"
-                                                        />
+                                                        <label className="text-[8px] uppercase opacity-40 block">Birim Fiyat</label>
+                                                        <input type="number" value={item.unitPrice} onChange={e => {
+                                                            const ni = [...(editingProposal.items || [])]; const p = parseFloat(e.target.value) || 0;
+                                                            ni[index].unitPrice = p; ni[index].total = ni[index].quantity * p;
+                                                            const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
+                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
                                                     </div>
-                                                    <div className="text-right">
-                                                        <label className="text-[8px] uppercase opacity-50 block">Total</label>
-                                                        <span className="font-bold text-sm">₺{item.total.toLocaleString()}</span>
+                                                    <div className="text-right shrink-0">
+                                                        <label className="text-[8px] uppercase opacity-40 block">Toplam</label>
+                                                        <span className="font-bold text-sm" style={{ color: epc }}>{ecs}{item.total.toLocaleString()}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
+                                        {(editingProposal.items || []).length === 0 && (
+                                            <div className={`py-8 text-center rounded-xl border-2 border-dashed ${isAdminNight ? 'border-white/10' : 'border-black/10'}`}>
+                                                <p className="text-xs opacity-30">Henuz kalem eklenmedi</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Items Total Summary */}
+                                    <div className={`p-3 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
+                                        <div className="flex justify-between text-xs opacity-50 mb-1">
+                                            <span>Ara Toplam</span><span>{eFmt(eSubtotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs opacity-50 mb-2">
+                                            <span>KDV (%{eTaxRate})</span><span>{eFmt(eTax)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-sm pt-2 border-t" style={{ borderColor: isAdminNight ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                                            <span>Genel Toplam</span><span style={{ color: epc }}>{eFmt(eTotal)}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* FOOTER SECTION */}
-                                <div className="space-y-4 border-t border-white/10 pt-6">
-                                    <h4 className="text-xs font-bold uppercase tracking-widest opacity-50">Footer & Signing</h4>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Signatory Name</label>
-                                        <input
-                                            value={editingProposal.footerName || 'Selin Alpa'}
-                                            onChange={e => setEditingProposal({ ...editingProposal, footerName: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
+                                {/* FOOTER & CONTACT */}
+                                <div className={`space-y-3 p-4 rounded-2xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-2">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                        Imza & Iletisim
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Yetkili Adi</label>
+                                            <input value={editingProposal.footerName || ''} onChange={e => setEditingProposal({ ...editingProposal, footerName: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Selin Alpa" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Unvan</label>
+                                            <input value={editingProposal.footerTitle || ''} onChange={e => setEditingProposal({ ...editingProposal, footerTitle: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Yetkili Imza" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Signatory Title</label>
-                                        <input
-                                            value={editingProposal.footerTitle || 'Authorized Signature'}
-                                            onChange={e => setEditingProposal({ ...editingProposal, footerTitle: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">Telefon</label>
+                                            <input value={editingProposal.phone || ''} onChange={e => setEditingProposal({ ...editingProposal, phone: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="+90 5XX XXX XX XX" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] opacity-40 block mb-0.5">E-posta</label>
+                                            <input value={editingProposal.email || ''} onChange={e => setEditingProposal({ ...editingProposal, email: e.target.value })}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="info@sirket.com" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Closing Note</label>
-                                        <input
-                                            value={editingProposal.footerNote || 'Thank you for your business.'}
-                                            onChange={e => setEditingProposal({ ...editingProposal, footerNote: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] opacity-50 block mb-1">Website</label>
-                                        <input
-                                            value={editingProposal.website || 'www.agencyos.com'}
-                                            onChange={e => setEditingProposal({ ...editingProposal, website: e.target.value })}
-                                            className="w-full bg-transparent border-b border-current/20 py-2 font-medium focus:outline-none focus:border-[#a62932] transition-colors"
-                                        />
-                                    </div>
+                                    <input value={editingProposal.website || ''} onChange={e => setEditingProposal({ ...editingProposal, website: e.target.value })}
+                                        className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="www.sirket.com" />
+                                    <textarea value={editingProposal.notes || ''} onChange={e => setEditingProposal({ ...editingProposal, notes: e.target.value })} rows={2}
+                                        className={`w-full bg-transparent border rounded-lg p-2 text-sm focus:outline-none resize-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} placeholder="Notlar & Kosullar (opsiyonel)" />
                                 </div>
                             </div>
 
-                            {/* SAVE BUTTON - Sticky Bottom */}
-                            <div className={`p-4 border-t shrink-0 ${isAdminNight ? 'border-white/10 bg-[#0a0a0a]' : 'border-black/10 bg-white'}`}>
-                                <button
-                                    onClick={() => {
-                                        updateProposal(editingProposal.id, editingProposal);
-                                        setEditingProposal(null);
-                                    }}
-                                    className="w-full bg-[#a62932] text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
-                                >
-                                    Save & Close Studio
+                            {/* SAVE BUTTON */}
+                            <div className={`p-4 border-t shrink-0 ${isAdminNight ? 'border-white/10 bg-[#0a0a0a]' : 'border-black/5 bg-white'}`}>
+                                <button onClick={() => { updateProposal(editingProposal.id, editingProposal); setEditingProposal(null); }}
+                                    className="w-full text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
+                                    style={{ background: epc }}>
+                                    Kaydet & Kapat
                                 </button>
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: REAL-TIME PREVIEW (60%) */}
-                        <div className="flex-1 bg-[#525659] p-8 md:p-12 overflow-y-auto flex justify-center items-start shadow-inner">
-                            {/* A4 PAPER PREVIEW */}
-                            <motion.div
-                                layoutId="paper-preview"
-                                className="bg-white text-black w-full max-w-[210mm] min-h-[297mm] p-[20mm] relative shadow-2xl origin-top transition-transform duration-300"
-                                style={{ transformOrigin: 'top center' }}
-                            >
-                                {/* DOCUMENT CONTENT (Same as Print Preview but sourced from editingProposal) */}
-                                <div className="flex justify-between items-start mb-16">
-                                    <div>
-                                        <h1 className="text-4xl font-black tracking-tighter mb-2">{editingProposal.logoText || 'AGENCY.OS'}</h1>
-                                        <p className="text-xs opacity-50 uppercase tracking-widest">{editingProposal.logoSubtext || 'Creative Digital Solutions'}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <h2 className="text-3xl font-light mb-1">PROPOSAL</h2>
-                                        <p className="opacity-50 text-sm">#{editingProposal.id}</p>
-                                        <p className="text-sm font-bold mt-2">{editingProposal.date}</p>
-                                    </div>
-                                </div>
+                        {/* RIGHT COLUMN: LIVE A4 PREVIEW */}
+                        <div className="flex-1 bg-[#3a3d40] p-6 md:p-10 overflow-y-auto flex justify-center items-start">
+                            <motion.div layoutId="paper-preview" className="bg-white text-black w-full max-w-[210mm] min-h-[297mm] relative shadow-2xl" style={{ transformOrigin: 'top center' }}>
+                                {/* Top accent bar */}
+                                <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${epc}, ${epc}88, ${epc}44)` }} />
 
-                                <div className="border-t border-b border-black/10 py-8 mb-12 flex justify-between">
-                                    <div className="w-1/2">
-                                        <h5 className="text-[10px] uppercase font-bold tracking-widest opacity-50 mb-2">{editingProposal.preparedForLabel || 'Prepared For'}</h5>
-                                        <h3 className="text-xl font-bold break-words pr-4">{editingProposal.clientName || 'Client Name'}</h3>
-                                        <p className="text-sm opacity-60">{editingProposal.attnText || 'Attn: Project Manager'}</p>
+                                <div className="px-[50px] pt-[50px] pb-[40px]">
+                                    {/* Header */}
+                                    <div className="flex justify-between items-start mb-12">
+                                        <div className="flex items-center gap-4">
+                                            {editingProposal.logoUrl ? (
+                                                <img src={editingProposal.logoUrl} alt="Logo" className="h-12 object-contain" />
+                                            ) : (
+                                                <div className="flex items-center">
+                                                    <span className="text-3xl font-black tracking-tight">{editingProposal.logoText || 'alpgraphics'}</span>
+                                                    <span className="text-3xl font-black" style={{ color: epc }}>.</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="inline-block px-4 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-[3px] mb-2"
+                                                style={{ background: epc + '12', color: epc }}>
+                                                TEKLIF
+                                            </div>
+                                            <div className="text-xs text-gray-400 mt-1">No: <span className="font-semibold text-gray-800">#{editingProposal.id}</span></div>
+                                            <div className="text-xs text-gray-400">Tarih: <span className="font-semibold text-gray-800">{editingProposal.date || new Date().toLocaleDateString('tr-TR')}</span></div>
+                                        </div>
                                     </div>
-                                    <div className="w-1/2 text-right">
-                                        <h5 className="text-[10px] uppercase font-bold tracking-widest opacity-50 mb-2">{editingProposal.projectLabel || 'Project'}</h5>
-                                        <h3 className="text-xl font-bold break-words pl-4">{editingProposal.title || 'Project Title'}</h3>
-                                        <p className="text-sm opacity-60">Valid until {editingProposal.validUntil}</p>
-                                    </div>
-                                </div>
 
-                                <div className="mb-12">
-                                    <h4 className="text-sm font-bold uppercase tracking-widest border-b border-black pb-4 mb-4">Services & Deliverables</h4>
-                                    {editingProposal.items && editingProposal.items.length > 0 ? (
-                                        <table className="w-full text-left">
-                                            <thead>
-                                                <tr className="text-[10px] uppercase opacity-50">
-                                                    <th className="py-2">Description</th>
-                                                    <th className="py-2 text-right">Qty</th>
-                                                    <th className="py-2 text-right">Price</th>
-                                                    <th className="py-2 text-right">Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {editingProposal.items.map(item => (
-                                                    <tr key={item.id} className="border-b border-black/5">
-                                                        <td className="py-4 font-medium">{item.description}</td>
-                                                        <td className="py-4 text-right opacity-60">{item.quantity}</td>
-                                                        <td className="py-4 text-right opacity-60">{(editingProposal.currencySymbol || '₺')}{item.unitPrice.toLocaleString()}</td>
-                                                        <td className="py-4 text-right font-bold">{(editingProposal.currencySymbol || '₺')}{item.total.toLocaleString()}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    ) : (
-                                        <div className="py-8 text-center bg-gray-50 rounded-lg">
-                                            <p className="opacity-50 italic">Start adding items from the panel to see them here.</p>
+                                    {/* Client & Project Cards */}
+                                    <div className="flex gap-6 mb-10 p-6 rounded-2xl" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                        <div className="flex-1">
+                                            <div className="text-[9px] font-bold uppercase tracking-[2px] mb-2" style={{ color: epc }}>{editingProposal.preparedForLabel || 'Hazirlanan'}</div>
+                                            <div className="text-lg font-bold">{editingProposal.clientName || 'Musteri Adi'}</div>
+                                            <div className="text-xs text-gray-400 mt-1">{editingProposal.attnText || ''}</div>
+                                        </div>
+                                        <div className="w-px bg-gray-200" />
+                                        <div className="flex-1">
+                                            <div className="text-[9px] font-bold uppercase tracking-[2px] mb-2" style={{ color: epc }}>{editingProposal.projectLabel || 'Proje'}</div>
+                                            <div className="text-lg font-bold">{editingProposal.title || 'Proje Basligi'}</div>
+                                            <div className="text-xs text-gray-400 mt-1">Gecerlilik: {editingProposal.validUntil}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Table */}
+                                    <div className="mb-8">
+                                        <div className="text-[9px] font-bold uppercase tracking-[2px] mb-4" style={{ color: epc }}>Hizmetler</div>
+                                        <div className="flex px-4 py-3 rounded-t-xl text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: epc }}>
+                                            <div className="flex-[3]">Hizmet</div>
+                                            <div className="flex-1 text-center">Adet</div>
+                                            <div className="flex-1 text-right">Birim</div>
+                                            <div className="flex-1 text-right">Toplam</div>
+                                        </div>
+                                        {editingProposal.items && editingProposal.items.length > 0 ? editingProposal.items.map((item, i) => (
+                                            <div key={item.id} className={`flex items-center px-4 py-4 border-b border-gray-100 ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
+                                                <div className="flex-[3] font-medium text-sm">{item.description}</div>
+                                                <div className="flex-1 text-center text-sm text-gray-500">{item.quantity}</div>
+                                                <div className="flex-1 text-right text-sm text-gray-500">{eFmt(item.unitPrice)}</div>
+                                                <div className="flex-1 text-right text-sm font-bold">{eFmt(item.total)}</div>
+                                            </div>
+                                        )) : (
+                                            <div className="py-8 text-center bg-gray-50 border-b border-gray-100">
+                                                <p className="text-gray-300 text-xs italic">Kalem eklemek icin sol paneli kullanin</p>
+                                            </div>
+                                        )}
+
+                                        {/* Totals */}
+                                        <div className="flex justify-end rounded-b-xl overflow-hidden border border-gray-100 border-t-0">
+                                            <div className="w-[300px]">
+                                                <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
+                                                    <span className="text-xs text-gray-400">Ara Toplam</span>
+                                                    <span className="text-xs font-semibold">{eFmt(eSubtotal)}</span>
+                                                </div>
+                                                <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
+                                                    <span className="text-xs text-gray-400">KDV (%{eTaxRate})</span>
+                                                    <span className="text-xs font-semibold">{eFmt(eTax)}</span>
+                                                </div>
+                                                <div className="flex justify-between px-4 py-3" style={{ background: epc + '08' }}>
+                                                    <span className="font-extrabold text-sm">GENEL TOPLAM</span>
+                                                    <span className="font-black text-lg" style={{ color: epc }}>{eFmt(eTotal)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Notes */}
+                                    {editingProposal.notes && (
+                                        <div className="p-4 rounded-xl mb-6" style={{ background: '#fffbeb', border: '1px solid #fef3c7' }}>
+                                            <div className="text-[9px] font-bold uppercase tracking-wider text-amber-700 mb-1">Notlar</div>
+                                            <p className="text-xs text-amber-800 leading-relaxed">{editingProposal.notes}</p>
                                         </div>
                                     )}
-                                </div>
 
-                                <div className="flex justify-end mb-20">
-                                    <div className="w-1/3">
-                                        <div className="flex justify-between py-2 border-b border-black/10">
-                                            <span className="opacity-50">Subtotal</span>
-                                            <span className="font-bold">{(editingProposal.currencySymbol || '₺')}{editingProposal.totalAmount.toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b border-black/10">
-                                            <span className="opacity-50">Tax ({(editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20)}%)</span>
-                                            <span className="font-bold">{(editingProposal.currencySymbol || '₺')}{(editingProposal.totalAmount * ((editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20) / 100)).toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between py-4 text-xl">
-                                            <span className="font-black">TOTAL</span>
-                                            <span className="font-black text-[#a62932]">{(editingProposal.currencySymbol || '₺')}{(editingProposal.totalAmount * (1 + ((editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20) / 100))).toLocaleString()}</span>
-                                        </div>
+                                    {/* Validity */}
+                                    <div className="flex items-center gap-2 p-3 rounded-xl mb-6" style={{ background: '#f0fdf4', border: '1px solid #dcfce7' }}>
+                                        <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="2"/><path strokeWidth="2" d="M12 6v6l4 2"/></svg>
+                                        <span className="text-xs text-green-700">Bu teklif <strong>{editingProposal.validUntil}</strong> tarihine kadar gecerlidir.</span>
                                     </div>
                                 </div>
 
-                                {/* FOOTER */}
-                                <div className="absolute bottom-[20mm] left-[20mm] right-[20mm] border-t-2 border-black pt-8 flex justify-between items-end">
-                                    <div>
-                                        <h4 className="font-bold mb-4">{editingProposal.footerName || 'Selin Alpa'}</h4>
-                                        <div className="h-12 border-b border-dashed border-black w-48 mb-2"></div>
-                                        <p className="text-[10px] uppercase font-bold tracking-widest opacity-50">{editingProposal.footerTitle || 'Authorized Signature'}</p>
-                                    </div>
-                                    <div className="text-right opacity-50 text-xs">
-                                        <p>{editingProposal.footerNote || 'Thank you for your business.'}</p>
-                                        <p>{editingProposal.website || 'www.agencyos.com'}</p>
+                                {/* Footer */}
+                                <div className="px-[50px] py-6 bg-gray-50 border-t border-gray-200">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <div className="font-bold text-sm mb-2">{editingProposal.footerName || 'Selin Alpa'}</div>
+                                            <div className="w-40 h-px bg-gray-300 mb-1.5" />
+                                            <div className="text-[9px] font-semibold uppercase tracking-widest text-gray-400">{editingProposal.footerTitle || 'Yetkili Imza'}</div>
+                                        </div>
+                                        <div className="text-right text-[11px] text-gray-400 leading-6">
+                                            {editingProposal.phone && <div>{editingProposal.phone}</div>}
+                                            {editingProposal.email && <div>{editingProposal.email}</div>}
+                                            <div className="font-semibold" style={{ color: epc }}>{editingProposal.website || 'www.alpgraphics.net'}</div>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Bottom accent */}
+                                <div className="h-1" style={{ background: `linear-gradient(90deg, ${epc}44, ${epc}, ${epc}44)` }} />
                             </motion.div>
                         </div>
                     </div>
-                )
+                    );
+                })()
                 }
 
 

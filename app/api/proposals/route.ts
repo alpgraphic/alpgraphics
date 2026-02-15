@@ -39,9 +39,10 @@ export async function POST(request: NextRequest) {
         const ALLOWED_FIELDS = [
             'id', 'title', 'clientName', 'date', 'validUntil', 'items',
             'totalAmount', 'status', 'currency', 'currencySymbol', 'taxRate',
-            'logoText', 'logoSubtext', 'attnText', 'preparedForLabel',
-            'projectLabel', 'footerName', 'footerTitle', 'footerNote',
-            'website', 'accountId',
+            'logoText', 'logoSubtext', 'logoUrl', 'primaryColor', 'attnText',
+            'preparedForLabel', 'projectLabel', 'footerName', 'footerTitle',
+            'footerNote', 'website', 'phone', 'email', 'address', 'notes',
+            'accountId',
         ];
 
         const safeProposal: Record<string, any> = {
@@ -90,9 +91,10 @@ export async function PUT(request: NextRequest) {
         const ALLOWED_UPDATE_FIELDS = [
             'title', 'clientName', 'date', 'validUntil', 'items',
             'totalAmount', 'status', 'currency', 'currencySymbol', 'taxRate',
-            'logoText', 'logoSubtext', 'attnText', 'preparedForLabel',
-            'projectLabel', 'footerName', 'footerTitle', 'footerNote',
-            'website', 'accountId',
+            'logoText', 'logoSubtext', 'logoUrl', 'primaryColor', 'attnText',
+            'preparedForLabel', 'projectLabel', 'footerName', 'footerTitle',
+            'footerNote', 'website', 'phone', 'email', 'address', 'notes',
+            'accountId',
         ];
 
         const safeUpdates: Record<string, any> = { updatedAt: new Date() };
