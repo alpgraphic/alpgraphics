@@ -13,8 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { COLORS, SPACING, FONTS, RADIUS, TOKEN_KEYS } from '../lib/constants';
-import { verify2FA, storage } from '../lib/auth';
+import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
+import { verify2FA } from '../lib/auth';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = {
@@ -83,7 +83,7 @@ export default function TwoFactorScreen({ navigation, route }: Props) {
             const result = await verify2FA(adminId, codeStr);
 
             if (result.success) {
-                await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role: 'admin' }));
+                // verify2FA in auth.ts already stores full user data with account info
                 navigation.replace('AdminDashboard');
             } else {
                 Alert.alert('Hata', result.error || 'Dogrulama basarisiz');

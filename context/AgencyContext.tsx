@@ -721,7 +721,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         // Backend Sync
         try {
             // Only sync if it look like a MongoDB ID (string)
-            if (typeof id === 'string' && id.length > 10) {
+            if (typeof id === 'string' && /^[0-9a-f]{24}$/.test(id)) {
                 await fetch('/api/accounts', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },

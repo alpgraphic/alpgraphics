@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAccountsCollection } from '@/lib/mongodb';
+import bcrypt from 'bcryptjs';
+import { getAccountsCollection, DbAccount } from '@/lib/mongodb';
 import { rateLimitMiddleware } from '@/lib/security/rateLimit';
 import { verifyMobileSession } from '@/lib/auth/mobileSession';
+import { generateBriefToken } from '@/lib/briefTypes';
+import { validatePassword } from '@/lib/security/password';
 
 // GET /api/mobile/accounts - Get accounts (admin: all, client: own)
 export async function GET(request: NextRequest) {
@@ -23,10 +26,10 @@ export async function GET(request: NextRequest) {
         const accounts = await getAccountsCollection();
         const { ObjectId } = await import('mongodb');
 
-        // Admin: return all client accounts
+        // Admin: return all client accounts (including those without role field)
         if (role === 'admin') {
             const allAccounts = await accounts
-                .find({ role: { $ne: 'admin' } })
+                .find({ $or: [{ role: { $ne: 'admin' } }, { role: { $exists: false } }] })
                 .sort({ createdAt: -1 })
                 .toArray();
 
@@ -84,10 +87,12 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// PUT /api/mobile/accounts - Update current user's account
+// PUT /api/mobile/accounts - Update account (client: self only, admin: any account)
 export async function PUT(request: NextRequest) {
     try {
-        // DB-backed session verification
+        const rateLimited = await rateLimitMiddleware(request, 'api');
+        if (rateLimited) return rateLimited;
+
         const session = await verifyMobileSession();
         if (!session) {
             return NextResponse.json(
@@ -96,42 +101,151 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const clientId = session.userId;
-
         const body = await request.json();
-        const { name, company } = body;
+        const { name, company, accountId, briefStatus, briefApprovedAt } = body;
 
         const accounts = await getAccountsCollection();
         const { ObjectId } = await import('mongodb');
 
+        // Admin can target any account, client can only update self
+        const targetId = (session.role === 'admin' && accountId) ? accountId : session.userId;
+
+        if (!targetId || !ObjectId.isValid(targetId)) {
+            return NextResponse.json(
+                { success: false, error: 'Gecersiz hesap ID' },
+                { status: 400 }
+            );
+        }
+
+        // Build update fields
+        const updateFields: Record<string, any> = { updatedAt: new Date() };
+        if (name) updateFields.name = String(name).trim();
+        if (company) updateFields.company = String(company).trim();
+
+        // Admin-only fields
+        if (session.role === 'admin') {
+            if (briefStatus && ['pending', 'submitted', 'approved', 'none'].includes(briefStatus)) {
+                updateFields.briefStatus = briefStatus;
+            }
+            if (briefApprovedAt) {
+                updateFields.briefApprovedAt = new Date(briefApprovedAt);
+            }
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await accounts.updateOne(
-            { _id: new ObjectId(clientId) } as any,
-            {
-                $set: {
-                    ...(name && { name }),
-                    ...(company && { company }),
-                    updatedAt: new Date(),
-                }
-            }
+            { _id: new ObjectId(targetId) } as any,
+            { $set: updateFields }
         );
 
         if (result.matchedCount === 0) {
             return NextResponse.json(
-                { success: false, error: 'Hesap bulunamadı' },
+                { success: false, error: 'Hesap bulunamadi' },
                 { status: 404 }
             );
         }
 
         return NextResponse.json({
             success: true,
-            message: 'Hesap güncellendi',
+            message: 'Hesap guncellendi',
         });
 
     } catch (error) {
         console.error('Update account error:', error);
         return NextResponse.json(
-            { success: false, error: 'Hesap güncellenemedi' },
+            { success: false, error: 'Hesap guncellenemedi' },
+            { status: 500 }
+        );
+    }
+}
+
+// POST /api/mobile/accounts - Create new client account (admin only)
+export async function POST(request: NextRequest) {
+    try {
+        const rateLimited = await rateLimitMiddleware(request, 'api');
+        if (rateLimited) return rateLimited;
+
+        const session = await verifyMobileSession();
+        if (!session || session.role !== 'admin') {
+            return NextResponse.json(
+                { success: false, error: 'Admin yetkisi gerekli' },
+                { status: 403 }
+            );
+        }
+
+        const body = await request.json();
+        const { name, company, email, password } = body;
+
+        if (!name || !company || !email || !password) {
+            return NextResponse.json(
+                { success: false, error: 'Tum alanlar zorunludur' },
+                { status: 400 }
+            );
+        }
+
+        // Validate email
+        const emailStr = String(email).toLowerCase().trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+            return NextResponse.json(
+                { success: false, error: 'Gecersiz e-posta' },
+                { status: 400 }
+            );
+        }
+
+        // Validate password
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.valid) {
+            return NextResponse.json(
+                { success: false, error: 'Sifre yeterince guclu degil', details: passwordValidation.errors },
+                { status: 400 }
+            );
+        }
+
+        const accounts = await getAccountsCollection();
+
+        // Check duplicate
+        const existing = await accounts.findOne({ email: emailStr });
+        if (existing) {
+            return NextResponse.json(
+                { success: false, error: 'Hesap olusturulamadi' },
+                { status: 400 }
+            );
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        const briefToken = generateBriefToken();
+
+        const newAccount: DbAccount = {
+            name: String(name).trim(),
+            company: String(company).trim(),
+            email: emailStr,
+            passwordHash,
+            briefToken,
+            totalDebt: 0,
+            totalPaid: 0,
+            balance: 0,
+            status: 'Active',
+            briefStatus: 'none',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        const result = await accounts.insertOne(newAccount);
+
+        return NextResponse.json({
+            success: true,
+            account: {
+                id: result.insertedId.toString(),
+                name: newAccount.name,
+                company: newAccount.company,
+                email: newAccount.email,
+            },
+        });
+
+    } catch (error) {
+        console.error('Create account error:', error);
+        return NextResponse.json(
+            { success: false, error: 'Hesap olusturulamadi' },
             { status: 500 }
         );
     }

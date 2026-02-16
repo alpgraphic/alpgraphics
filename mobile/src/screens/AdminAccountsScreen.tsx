@@ -77,7 +77,7 @@ export default function AdminAccountsScreen({ navigation }: Props) {
         }
 
         try {
-            const result = await apiRequest('/api/accounts', {
+            const result = await apiRequest('/api/mobile/accounts', {
                 method: 'POST',
                 body: JSON.stringify({
                     name: newName.trim(),
