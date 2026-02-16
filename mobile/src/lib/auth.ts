@@ -21,6 +21,7 @@ export interface LoginResult {
     success: boolean;
     requires2FA?: boolean;
     adminId?: string;
+    role?: string;
     error?: string;
 }
 
@@ -75,14 +76,13 @@ export function setSessionExpiredHandler(handler: () => void) {
 // Auth Functions
 export async function login(
     email: string,
-    password: string,
-    role: 'admin' | 'client'
+    password: string
 ): Promise<LoginResult> {
     try {
         const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, role }),
+            body: JSON.stringify({ email, password }),
         });
 
         const data = await response.json();
@@ -93,11 +93,13 @@ export async function login(
                 success: false,
                 requires2FA: true,
                 adminId: data.adminId,
+                role: data.role || 'admin',
             };
         }
 
         // Direct login success - validate response has tokens
         if (data.success && data.accessToken && data.refreshToken) {
+            const role = data.role || 'client';
             await storage.set(TOKEN_KEYS.ACCESS_TOKEN, data.accessToken);
             await storage.set(TOKEN_KEYS.REFRESH_TOKEN, data.refreshToken);
             if (data.account) {
@@ -108,7 +110,7 @@ export async function login(
             } else {
                 await storage.set(TOKEN_KEYS.USER_DATA, JSON.stringify({ role }));
             }
-            return { success: true };
+            return { success: true, role };
         }
 
         return { success: false, error: data.error || 'Giris basarisiz' };

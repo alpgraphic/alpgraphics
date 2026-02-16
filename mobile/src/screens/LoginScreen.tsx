@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, SPACING, FONTS, RADIUS, TOKEN_KEYS } from '../lib/constants';
-import { login, storage } from '../lib/auth';
+import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
+import { login } from '../lib/auth';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = {
@@ -23,7 +23,6 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
     const insets = useSafeAreaInsets();
-    const [role, setRole] = useState<'admin' | 'client'>('client');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -47,22 +46,21 @@ export default function LoginScreen({ navigation }: Props) {
         }
 
         setIsLoading(true);
-        // Capture role at start to prevent race condition if user changes role during async login
-        const currentRole = role;
 
         try {
-            const result = await login(trimmedEmail, password, currentRole);
+            const result = await login(trimmedEmail, password);
 
             if (result.requires2FA && result.adminId) {
                 navigation.navigate('TwoFactor', { adminId: result.adminId });
             } else if (result.success) {
-                if (currentRole === 'admin') {
+                // Auto-route based on role returned from backend
+                if (result.role === 'admin') {
                     navigation.replace('AdminDashboard');
                 } else {
                     navigation.replace('Dashboard');
                 }
             } else {
-                Alert.alert('Giris Basarisiz', result.error || 'E-posta veya sifre hatali');
+                Alert.alert('Giriş Başarısız', result.error || 'E-posta veya şifre hatalı');
             }
         } catch (error) {
             Alert.alert('Hata', 'Bağlantı hatası. Lütfen tekrar deneyin.');
@@ -80,37 +78,22 @@ export default function LoginScreen({ navigation }: Props) {
                 style={styles.keyboardView}
             >
                 <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+                    {/* Back button */}
+                    <TouchableOpacity
+                        style={styles.backBtn}
+                        onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
+                        activeOpacity={0.6}
+                    >
+                        <Text style={styles.backBtnText}>← Geri</Text>
+                    </TouchableOpacity>
+
                     {/* Brand */}
                     <View style={styles.brandSection}>
                         <View style={styles.brand}>
                             <View style={styles.brandDot} />
                             <Text style={styles.brandText}>alpgraphics</Text>
                         </View>
-                        <Text style={styles.brandSub}>
-                            {role === 'admin' ? 'Yönetim Paneli' : 'Müşteri Portalı'}
-                        </Text>
-                    </View>
-
-                    {/* Role Toggle */}
-                    <View style={styles.toggleContainer}>
-                        <TouchableOpacity
-                            style={[styles.toggleBtn, role === 'admin' && styles.toggleActive]}
-                            onPress={() => setRole('admin')}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.toggleText, role === 'admin' && styles.toggleTextActive]}>
-                                Admin
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.toggleBtn, role === 'client' && styles.toggleActive]}
-                            onPress={() => setRole('client')}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.toggleText, role === 'client' && styles.toggleTextActive]}>
-                                Client
-                            </Text>
-                        </TouchableOpacity>
+                        <Text style={styles.brandSub}>Hesabınıza giriş yapın</Text>
                     </View>
 
                     {/* Inputs */}
@@ -179,8 +162,17 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: SPACING.lg,
     },
+    backBtn: {
+        marginBottom: SPACING.lg,
+        alignSelf: 'flex-start',
+    },
+    backBtnText: {
+        fontSize: FONTS.sm,
+        color: COLORS.textSecondary,
+        fontWeight: FONTS.medium,
+    },
     brandSection: {
-        marginBottom: SPACING.xxl + SPACING.lg,
+        marginBottom: SPACING.xxl,
     },
     brand: {
         flexDirection: 'row',
@@ -204,32 +196,6 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         marginTop: SPACING.xs,
         marginLeft: SPACING.md + 2,
-    },
-    toggleContainer: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        borderRadius: RADIUS.lg,
-        padding: 4,
-        marginBottom: SPACING.xl,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    toggleBtn: {
-        flex: 1,
-        paddingVertical: SPACING.md - 2,
-        alignItems: 'center',
-        borderRadius: RADIUS.md,
-    },
-    toggleActive: {
-        backgroundColor: COLORS.text,
-    },
-    toggleText: {
-        fontSize: FONTS.sm,
-        fontWeight: FONTS.semibold,
-        color: COLORS.textMuted,
-    },
-    toggleTextActive: {
-        color: COLORS.textInverse,
     },
     inputSection: {
         marginBottom: SPACING.lg,

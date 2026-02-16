@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { getAccountsCollection } from '@/lib/mongodb';
 import { checkRateLimit, getClientIP } from '@/lib/security/rateLimit';
@@ -23,7 +22,7 @@ interface TokenResponse {
 // Generic error to prevent user enumeration
 const INVALID_CREDENTIALS_MSG = 'E-posta veya şifre hatalı';
 
-// POST /api/mobile/auth - Login
+// POST /api/mobile/auth - Login (auto-detect role from credentials)
 export async function POST(request: NextRequest): Promise<NextResponse<TokenResponse>> {
     try {
         const ip = getClientIP(request);
@@ -38,11 +37,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
         }
 
         const body = await request.json();
-        const { email, password, role } = body;
+        const { email, password } = body;
 
-        if (!email || !password || !role) {
+        if (!email || !password) {
             return NextResponse.json(
-                { success: false, error: 'Email, password ve role gereklidir' },
+                { success: false, error: 'Email ve password gereklidir' },
                 { status: 400 }
             );
         }
@@ -56,98 +55,72 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
             );
         }
 
-        const cookieStore = await cookies();
         const accounts = await getAccountsCollection();
 
-        // Admin login
-        if (role === 'admin') {
-            // SAFE: exact match, no regex
-            const admin = await accounts.findOne({ email: emailStr, role: 'admin' });
+        // Auto-detect: first try admin, then client
+        const admin = await accounts.findOne({ email: emailStr, role: 'admin' });
 
-            if (!admin || !admin.passwordHash) {
-                await bcrypt.compare(password, '$2a$12$invalidhashpaddingtomakeitsamelengthasbcrypt');
-                return NextResponse.json(
-                    { success: false, error: INVALID_CREDENTIALS_MSG },
-                    { status: 401 }
-                );
-            }
-
+        if (admin && admin.passwordHash) {
             const isValidPassword = await bcrypt.compare(password, admin.passwordHash);
-            if (!isValidPassword) {
+            if (isValidPassword) {
+                // Admin requires 2FA - always
+                if (admin.twoFactorSecret) {
+                    return NextResponse.json({
+                        success: true,
+                        requires2FA: true,
+                        adminId: admin._id!.toString(),
+                        role: 'admin',
+                    });
+                }
+
+                // No 2FA secret set — block login (must set up 2FA first via web)
                 return NextResponse.json(
-                    { success: false, error: INVALID_CREDENTIALS_MSG },
-                    { status: 401 }
+                    { success: false, error: '2FA kurulumu eksik. Lutfen web panelden 2FA ayarlayin.' },
+                    { status: 403 }
                 );
             }
+        }
 
-            // Admin requires 2FA - always
-            if (admin.twoFactorSecret) {
+        // Try client login
+        const account = await accounts.findOne({
+            email: emailStr,
+            $or: [
+                { role: 'client' },
+                { role: { $exists: false } }
+            ]
+        } as any);
+
+        if (account && account.passwordHash) {
+            const isValidPassword = await bcrypt.compare(password, account.passwordHash);
+            if (isValidPassword) {
+                // Create DB-backed session
+                const tokens = await createMobileSession(
+                    account._id!.toString(),
+                    account.email,
+                    'client'
+                );
+
                 return NextResponse.json({
                     success: true,
-                    requires2FA: true,
-                    adminId: admin._id!.toString(),
+                    accessToken: tokens.accessToken,
+                    refreshToken: tokens.refreshToken,
+                    expiresIn: 15 * 60,
+                    role: 'client',
+                    account: {
+                        id: account._id!.toString(),
+                        name: account.name,
+                        email: account.email,
+                        company: account.company,
+                    },
                 });
             }
-
-            // No 2FA secret set — block login (must set up 2FA first via web)
-            return NextResponse.json(
-                { success: false, error: '2FA kurulumu eksik. Lutfen web panelden 2FA ayarlayin.' },
-                { status: 403 }
-            );
         }
 
-        // Client login
-        if (role === 'client') {
-            // SAFE: exact match, no regex
-            const account = await accounts.findOne({
-                email: emailStr,
-                $or: [
-                    { role: 'client' },
-                    { role: { $exists: false } }
-                ]
-            } as any);
-
-            if (!account || !account.passwordHash) {
-                await bcrypt.compare(password, '$2a$12$invalidhashpaddingtomakeitsamelengthasbcrypt');
-                return NextResponse.json(
-                    { success: false, error: INVALID_CREDENTIALS_MSG },
-                    { status: 401 }
-                );
-            }
-
-            const isValidPassword = await bcrypt.compare(password, account.passwordHash);
-            if (!isValidPassword) {
-                return NextResponse.json(
-                    { success: false, error: INVALID_CREDENTIALS_MSG },
-                    { status: 401 }
-                );
-            }
-
-            // Create DB-backed session
-            const tokens = await createMobileSession(
-                account._id!.toString(),
-                account.email,
-                'client'
-            );
-
-            return NextResponse.json({
-                success: true,
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-                expiresIn: 15 * 60,
-                role: 'client',
-                account: {
-                    id: account._id!.toString(),
-                    name: account.name,
-                    email: account.email,
-                    company: account.company,
-                },
-            });
-        }
-
+        // Neither admin nor client matched — constant-time dummy comparison to prevent timing attacks
+        await bcrypt.compare(password, '$2a$12$invalidhashpaddingtomakeitsamelengthasbcrypt');
         return NextResponse.json(
-            { success: false, error: 'Geçersiz rol' },
-            { status: 400 }
+            { success: false, error: INVALID_CREDENTIALS_MSG },
+            { status: 401 }
         );
 
     } catch (error) {

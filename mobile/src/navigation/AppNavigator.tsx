@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import TwoFactorScreen from '../screens/TwoFactorScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -15,6 +16,7 @@ import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '
 import { COLORS } from '../lib/constants';
 
 export type RootStackParamList = {
+    Welcome: undefined;
     Login: undefined;
     TwoFactor: { adminId: string };
     Dashboard: undefined;
@@ -37,7 +39,7 @@ function LoadingScreen() {
 
 export default function AppNavigator() {
     const [isReady, setIsReady] = useState(false);
-    const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
+    const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Welcome');
     const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
     useEffect(() => {
@@ -48,12 +50,13 @@ export default function AppNavigator() {
                     const userData = await getUserData();
                     if (userData?.role === 'admin') {
                         setInitialRoute('AdminDashboard');
-                    } else {
+                    } else if (userData?.role) {
                         setInitialRoute('Dashboard');
                     }
+                    // If authenticated, skip Welcome and Login
                 }
             } catch {
-                // Default to Login on any error
+                // Default to Welcome on any error
             }
             setIsReady(true);
         };
@@ -73,7 +76,7 @@ export default function AppNavigator() {
                         if (navigationRef.current) {
                             navigationRef.current.reset({
                                 index: 0,
-                                routes: [{ name: 'Login' }],
+                                routes: [{ name: 'Welcome' }],
                             });
                         }
                     },
@@ -95,6 +98,13 @@ export default function AppNavigator() {
                     animation: 'slide_from_right',
                 }}
             >
+                {/* Welcome / Splash */}
+                <Stack.Screen
+                    name="Welcome"
+                    component={WelcomeScreen}
+                    options={{ animation: 'fade' }}
+                />
+
                 {/* Auth */}
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen

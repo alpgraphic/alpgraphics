@@ -92,7 +92,7 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                 style: 'destructive',
                 onPress: async () => {
                     await logout();
-                    navigation.replace('Login');
+                    navigation.replace('Welcome');
                 },
             },
         ]);
