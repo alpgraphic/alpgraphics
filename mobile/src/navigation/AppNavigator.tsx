@@ -11,6 +11,7 @@ import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import AdminAccountsScreen from '../screens/AdminAccountsScreen';
 import AdminBriefsScreen from '../screens/AdminBriefsScreen';
 import AdminFinanceScreen from '../screens/AdminFinanceScreen';
+import AdminProposalsScreen from '../screens/AdminProposalsScreen';
 
 import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
@@ -24,6 +25,7 @@ export type RootStackParamList = {
     AdminAccounts: undefined;
     AdminBriefs: undefined;
     AdminFinance: undefined;
+    AdminProposals: undefined;
     BriefForm: undefined;
 };
 
@@ -121,6 +123,7 @@ export default function AppNavigator() {
                 <Stack.Screen name="AdminAccounts" component={AdminAccountsScreen} />
                 <Stack.Screen name="AdminBriefs" component={AdminBriefsScreen} />
                 <Stack.Screen name="AdminFinance" component={AdminFinanceScreen} />
+                <Stack.Screen name="AdminProposals" component={AdminProposalsScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

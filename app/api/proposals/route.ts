@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
             'logoText', 'logoSubtext', 'logoUrl', 'primaryColor', 'attnText',
             'preparedForLabel', 'projectLabel', 'footerName', 'footerTitle',
             'footerNote', 'website', 'phone', 'email', 'address', 'notes',
-            'accountId',
+            'accountId', 'showKdv', 'useDirectTotal',
         ];
 
         const safeProposal: Record<string, any> = {
@@ -94,7 +94,7 @@ export async function PUT(request: NextRequest) {
             'logoText', 'logoSubtext', 'logoUrl', 'primaryColor', 'attnText',
             'preparedForLabel', 'projectLabel', 'footerName', 'footerTitle',
             'footerNote', 'website', 'phone', 'email', 'address', 'notes',
-            'accountId',
+            'accountId', 'showKdv', 'useDirectTotal',
         ];
 
         const safeUpdates: Record<string, any> = { updatedAt: new Date() };
