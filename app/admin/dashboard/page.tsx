@@ -1730,7 +1730,7 @@ export default function AdminDashboard() {
                     const ecs = editingProposal.currencySymbol || '₺';
                     const eTaxRate = editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20;
                     const showKdv = editingProposal.showKdv !== false;
-                    const eSubtotal = (editingProposal.items || []).reduce((sum: number, i: { quantity: number; unitPrice: number; total: number; directTotal?: boolean }) => sum + (i.directTotal ? (i.total || 0) : i.quantity * i.unitPrice), 0) || editingProposal.totalAmount;
+                    const eSubtotal = (editingProposal.items || []).reduce((sum: number, i: { quantity: number; unitPrice: number; total: number }) => sum + (i.unitPrice === 0 ? (i.total || 0) : i.quantity * i.unitPrice), 0) || editingProposal.totalAmount;
                     const eTax = eSubtotal * (eTaxRate / 100);
                     const eTotal = showKdv ? eSubtotal + eTax : eSubtotal;
                     const eFmt = (n: number) => `${ecs}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1914,50 +1914,35 @@ export default function AdminDashboard() {
                                                     </button>
                                                 </div>
                                                 <div className="flex gap-3 items-center">
-                                                    {!item.directTotal && (
-                                                        <>
-                                                            <div className="w-16">
-                                                                <label className="text-[8px] uppercase opacity-40 block">Adet</label>
-                                                                <input type="number" value={item.quantity} onChange={e => {
-                                                                    const ni = [...(editingProposal.items || [])]; const q = parseFloat(e.target.value) || 0;
-                                                                    ni[index].quantity = q; ni[index].total = q * ni[index].unitPrice;
-                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
-                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                                }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="text-[8px] uppercase opacity-40 block">Birim Fiyat</label>
-                                                                <input type="number" value={item.unitPrice} onChange={e => {
-                                                                    const ni = [...(editingProposal.items || [])]; const p = parseFloat(e.target.value) || 0;
-                                                                    ni[index].unitPrice = p; ni[index].total = ni[index].quantity * p;
-                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
-                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                                }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                    <div className={item.directTotal ? 'flex-1' : 'text-right shrink-0'}>
-                                                        <div className="flex items-center justify-end gap-1 mb-0.5">
-                                                            <label className="text-[8px] uppercase opacity-40">Toplam</label>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const ni = [...(editingProposal.items || [])];
-                                                                    ni[index].directTotal = !ni[index].directTotal;
-                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + (i.total || 0), 0);
-                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                                }}
-                                                                title={item.directTotal ? 'Birim fiyat ile gir' : 'Direkt toplam gir'}
-                                                                className={`text-[7px] px-1 py-0.5 rounded font-bold transition-all ${item.directTotal ? 'text-white' : 'opacity-30 hover:opacity-60'}`}
-                                                                style={{ background: item.directTotal ? epc : 'transparent', border: `1px solid ${item.directTotal ? epc : 'currentColor'}` }}
-                                                            >✎</button>
-                                                        </div>
-                                                        {item.directTotal ? (
-                                                            <input type="number" value={item.total} onChange={e => {
+                                                    <div className="w-14">
+                                                        <label className="text-[8px] uppercase opacity-40 block">Adet</label>
+                                                        <input type="number" value={item.quantity || ''} onChange={e => {
+                                                            const ni = [...(editingProposal.items || [])]; const q = parseFloat(e.target.value) || 0;
+                                                            ni[index].quantity = q;
+                                                            if (ni[index].unitPrice > 0) ni[index].total = q * ni[index].unitPrice;
+                                                            const nt = ni.reduce((s: number, i: { unitPrice: number; quantity: number; total: number }) => s + (i.unitPrice === 0 ? (i.total || 0) : i.quantity * i.unitPrice), 0);
+                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} placeholder="1" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="text-[8px] uppercase opacity-40 block">Birim Fiyat</label>
+                                                        <input type="number" value={item.unitPrice === 0 ? '' : item.unitPrice} onChange={e => {
+                                                            const ni = [...(editingProposal.items || [])]; const p = parseFloat(e.target.value) || 0;
+                                                            ni[index].unitPrice = p;
+                                                            if (p > 0) ni[index].total = ni[index].quantity * p;
+                                                            const nt = ni.reduce((s: number, i: { unitPrice: number; quantity: number; total: number }) => s + (i.unitPrice === 0 ? (i.total || 0) : i.quantity * i.unitPrice), 0);
+                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} placeholder="boş → toplam gir" />
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <label className="text-[8px] uppercase opacity-40 block">Toplam</label>
+                                                        {item.unitPrice === 0 ? (
+                                                            <input type="number" value={item.total || ''} onChange={e => {
                                                                 const ni = [...(editingProposal.items || [])]; const t = parseFloat(e.target.value) || 0;
                                                                 ni[index].total = t;
-                                                                const nt = ni.reduce((s: number, i: { total: number }) => s + (i.total || 0), 0);
+                                                                const nt = ni.reduce((s: number, i: { unitPrice: number; quantity: number; total: number }) => s + (i.unitPrice === 0 ? (i.total || 0) : i.quantity * i.unitPrice), 0);
                                                                 setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                            }} className={`w-full bg-transparent border-b py-1 text-sm font-bold focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} style={{ color: epc }} />
+                                                            }} className={`w-20 bg-transparent border-b py-1 text-sm font-bold text-right focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} style={{ color: epc }} placeholder="0,00" />
                                                         ) : (
                                                             <span className="font-bold text-sm" style={{ color: epc }}>{ecs}{item.total.toLocaleString()}</span>
                                                         )}
@@ -2093,8 +2078,8 @@ export default function AdminDashboard() {
                                         {editingProposal.items && editingProposal.items.length > 0 ? editingProposal.items.map((item, i) => (
                                             <div key={item.id} className={`flex items-center px-4 py-4 border-b border-gray-100 ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
                                                 <div className="flex-[3] font-medium text-sm">{item.description}</div>
-                                                <div className="flex-1 text-center text-sm text-gray-500">{item.quantity}</div>
-                                                <div className="flex-1 text-right text-sm text-gray-500">{eFmt(item.unitPrice)}</div>
+                                                <div className="flex-1 text-center text-sm text-gray-500">{item.unitPrice === 0 ? '' : item.quantity}</div>
+                                                <div className="flex-1 text-right text-sm text-gray-500">{item.unitPrice === 0 ? '' : eFmt(item.unitPrice)}</div>
                                                 <div className="flex-1 text-right text-sm font-bold">{eFmt(item.total)}</div>
                                             </div>
                                         )) : (
