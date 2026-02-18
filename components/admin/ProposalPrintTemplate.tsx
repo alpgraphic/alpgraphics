@@ -55,6 +55,8 @@ export default function ProposalPrintTemplate({ proposal, onClose }: ProposalPri
     const taxRate = proposal.taxRate !== undefined ? proposal.taxRate : 20;
     const showKdv = proposal.showKdv !== false;
     const useDirectTotal = proposal.useDirectTotal === true;
+    const allNoUnitPrice = (proposal.items || []).length > 0 && (proposal.items || []).every(item => item.unitPrice === 0);
+    const hideBirim = useDirectTotal || allNoUnitPrice;
 
     const subtotal = useDirectTotal
         ? proposal.totalAmount
@@ -210,8 +212,8 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                                     }}>
                                         <div style={{ flex: 3 }}>Hizmet</div>
                                         <div style={{ flex: 1, textAlign: 'center' }}>Adet</div>
-                                        <div style={{ flex: 1, textAlign: 'right' }}>Birim Fiyat</div>
-                                        <div style={{ flex: 1, textAlign: 'right' }}>Toplam</div>
+                                        {!hideBirim && <div style={{ flex: 1, textAlign: 'right' }}>Birim Fiyat</div>}
+                                        {!useDirectTotal && <div style={{ flex: 1, textAlign: 'right' }}>Toplam</div>}
                                     </div>
 
                                     {/* Table Rows */}
@@ -227,9 +229,9 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                                                     <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.description}</div>
                                                 )}
                                             </div>
-                                            <div style={{ flex: 1, textAlign: 'center', fontSize: '14px', color: '#64748b' }}>{useDirectTotal ? '' : item.quantity}</div>
-                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', color: '#64748b' }}>{(useDirectTotal || item.unitPrice === 0) ? '' : fmt(item.unitPrice)}</div>
-                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', fontWeight: 700 }}>{useDirectTotal ? '' : (item.unitPrice === 0 ? fmt(item.total || 0) : fmt(item.quantity * item.unitPrice))}</div>
+                                            <div style={{ flex: 1, textAlign: 'center', fontSize: '14px', color: '#64748b' }}>{item.quantity}</div>
+                                            {!hideBirim && <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', color: '#64748b' }}>{item.unitPrice === 0 ? '' : fmt(item.unitPrice)}</div>}
+                                            {!useDirectTotal && <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', fontWeight: 700 }}>{item.unitPrice === 0 ? fmt(item.total || 0) : fmt(item.quantity * item.unitPrice)}</div>}
                                         </div>
                                     )) : (
                                         <div style={{ padding: '24px 20px', background: '#fff', borderBottom: '1px solid #f1f5f9' }}>

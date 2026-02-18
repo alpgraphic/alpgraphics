@@ -1736,6 +1736,8 @@ export default function AdminDashboard() {
                     const eTax = eSubtotal * (eTaxRate / 100);
                     const eTotal = showKdv ? eSubtotal + eTax : eSubtotal;
                     const eFmt = (n: number) => `${ecs}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    const allNoUnitPrice = (editingProposal.items || []).length > 0 && (editingProposal.items || []).every((i: { unitPrice: number }) => i.unitPrice === 0);
+                    const hideBirim = editingProposal.useDirectTotal || allNoUnitPrice;
 
                     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
                         const file = e.target.files?.[0];
@@ -2104,15 +2106,15 @@ export default function AdminDashboard() {
                                         <div className="flex px-4 py-3 rounded-t-xl text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: epc }}>
                                             <div className="flex-[3]">Hizmet</div>
                                             <div className="flex-1 text-center">Adet</div>
-                                            <div className="flex-1 text-right">Birim</div>
-                                            <div className="flex-1 text-right">Toplam</div>
+                                            {!hideBirim && <div className="flex-1 text-right">Birim</div>}
+                                            {!editingProposal.useDirectTotal && <div className="flex-1 text-right">Toplam</div>}
                                         </div>
                                         {editingProposal.items && editingProposal.items.length > 0 ? editingProposal.items.map((item, i) => (
                                             <div key={item.id} className={`flex items-center px-4 py-4 border-b border-gray-100 ${i % 2 !== 0 ? 'bg-gray-50/50' : ''}`}>
                                                 <div className="flex-[3] font-medium text-sm">{item.description}</div>
-                                                <div className="flex-1 text-center text-sm text-gray-500">{editingProposal.useDirectTotal ? '' : item.quantity}</div>
-                                                <div className="flex-1 text-right text-sm text-gray-500">{(editingProposal.useDirectTotal || item.unitPrice === 0) ? '' : eFmt(item.unitPrice)}</div>
-                                                <div className="flex-1 text-right text-sm font-bold">{editingProposal.useDirectTotal ? '' : eFmt(item.total)}</div>
+                                                <div className="flex-1 text-center text-sm text-gray-500">{item.quantity}</div>
+                                                {!hideBirim && <div className="flex-1 text-right text-sm text-gray-500">{item.unitPrice === 0 ? '' : eFmt(item.unitPrice)}</div>}
+                                                {!editingProposal.useDirectTotal && <div className="flex-1 text-right text-sm font-bold">{eFmt(item.total)}</div>}
                                             </div>
                                         )) : (
                                             <div className="py-8 text-center bg-gray-50 border-b border-gray-100">
