@@ -355,6 +355,7 @@ export interface Proposal {
     address?: string;
     notes?: string; // Additional terms/notes at end
     showKdv?: boolean; // KDV satırı gösterilsin mi (default: true)
+    useDirectTotal?: boolean; // Tüm kalemlere tek toplam fiyat girilsin mi
 }
 
 const INITIAL_PROPOSALS: Proposal[] = [];

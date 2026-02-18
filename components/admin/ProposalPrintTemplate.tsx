@@ -40,6 +40,7 @@ interface Proposal {
     address?: string;
     notes?: string;
     showKdv?: boolean;
+    useDirectTotal?: boolean;
 }
 
 interface ProposalPrintTemplateProps {
@@ -53,8 +54,11 @@ export default function ProposalPrintTemplate({ proposal, onClose }: ProposalPri
     const cs = proposal.currencySymbol || (proposal.currency === 'USD' ? '$' : proposal.currency === 'EUR' ? '€' : '₺');
     const taxRate = proposal.taxRate !== undefined ? proposal.taxRate : 20;
     const showKdv = proposal.showKdv !== false;
+    const useDirectTotal = proposal.useDirectTotal === true;
 
-    const subtotal = proposal.items?.reduce((sum, item) => sum + (item.unitPrice === 0 ? (item.total || 0) : item.quantity * item.unitPrice), 0) || proposal.totalAmount;
+    const subtotal = useDirectTotal
+        ? proposal.totalAmount
+        : (proposal.items?.reduce((sum, item) => sum + (item.unitPrice === 0 ? (item.total || 0) : item.quantity * item.unitPrice), 0) || proposal.totalAmount);
     const tax = subtotal * (taxRate / 100);
     const total = showKdv ? subtotal + tax : subtotal;
 
@@ -223,9 +227,9 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                                                     <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.description}</div>
                                                 )}
                                             </div>
-                                            <div style={{ flex: 1, textAlign: 'center', fontSize: '14px', color: '#64748b' }}>{item.unitPrice === 0 ? '' : item.quantity}</div>
-                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', color: '#64748b' }}>{item.unitPrice === 0 ? '' : fmt(item.unitPrice)}</div>
-                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', fontWeight: 700 }}>{item.unitPrice === 0 ? fmt(item.total || 0) : fmt(item.quantity * item.unitPrice)}</div>
+                                            <div style={{ flex: 1, textAlign: 'center', fontSize: '14px', color: '#64748b' }}>{useDirectTotal ? '' : item.quantity}</div>
+                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', color: '#64748b' }}>{(useDirectTotal || item.unitPrice === 0) ? '' : fmt(item.unitPrice)}</div>
+                                            <div style={{ flex: 1, textAlign: 'right', fontSize: '14px', fontWeight: 700 }}>{useDirectTotal ? '' : (item.unitPrice === 0 ? fmt(item.total || 0) : fmt(item.quantity * item.unitPrice))}</div>
                                         </div>
                                     )) : (
                                         <div style={{ padding: '24px 20px', background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
