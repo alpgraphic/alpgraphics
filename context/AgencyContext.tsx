@@ -323,6 +323,7 @@ export interface ProposalItem {
     quantity: number;
     unitPrice: number;
     total: number;
+    directTotal?: boolean; // Birim fiyat yerine toplam direkt girildi mi
 }
 
 export interface Proposal {
@@ -353,6 +354,7 @@ export interface Proposal {
     email?: string;
     address?: string;
     notes?: string; // Additional terms/notes at end
+    showKdv?: boolean; // KDV satırı gösterilsin mi (default: true)
 }
 
 const INITIAL_PROPOSALS: Proposal[] = [];

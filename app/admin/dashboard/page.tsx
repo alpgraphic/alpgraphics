@@ -1729,9 +1729,10 @@ export default function AdminDashboard() {
                     const epc = editingProposal.primaryColor || '#a62932';
                     const ecs = editingProposal.currencySymbol || '₺';
                     const eTaxRate = editingProposal.taxRate !== undefined ? editingProposal.taxRate : 20;
-                    const eSubtotal = (editingProposal.items || []).reduce((sum: number, i: { quantity: number; unitPrice: number }) => sum + i.quantity * i.unitPrice, 0) || editingProposal.totalAmount;
+                    const showKdv = editingProposal.showKdv !== false;
+                    const eSubtotal = (editingProposal.items || []).reduce((sum: number, i: { quantity: number; unitPrice: number; total: number; directTotal?: boolean }) => sum + (i.directTotal ? (i.total || 0) : i.quantity * i.unitPrice), 0) || editingProposal.totalAmount;
                     const eTax = eSubtotal * (eTaxRate / 100);
-                    const eTotal = eSubtotal + eTax;
+                    const eTotal = showKdv ? eSubtotal + eTax : eSubtotal;
                     const eFmt = (n: number) => `${ecs}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
                     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1756,11 +1757,11 @@ export default function AdminDashboard() {
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-sm">Teklif Studio</h3>
-                                        <p className="text-[10px] opacity-40">Canli Onizleme</p>
+                                        <p className="text-[10px] opacity-40">Canlı Önizleme</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setPrintingProposal(editingProposal)} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors" title="Yazdir">
+                                    <button onClick={() => setPrintingProposal(editingProposal)} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors" title="Yazdır">
                                         <svg className="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                     </button>
                                     <button onClick={() => { updateProposal(editingProposal.id, editingProposal); setEditingProposal(null); }}
@@ -1853,9 +1854,20 @@ export default function AdminDashboard() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-[10px] opacity-40 block mb-0.5">KDV (%)</label>
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <label className="text-[10px] opacity-40">KDV (%)</label>
+                                                <button
+                                                    onClick={() => setEditingProposal({ ...editingProposal, showKdv: !showKdv })}
+                                                    className={`relative w-7 h-4 rounded-full transition-colors ${showKdv ? '' : 'opacity-40'}`}
+                                                    style={{ background: showKdv ? epc : '#94a3b8' }}
+                                                    title={showKdv ? 'KDV görünür' : 'KDV gizli'}
+                                                >
+                                                    <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${showKdv ? 'left-3.5' : 'left-0.5'}`} />
+                                                </button>
+                                            </div>
                                             <input type="number" value={eTaxRate} onChange={e => setEditingProposal({ ...editingProposal, taxRate: parseFloat(e.target.value) })}
-                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} />
+                                                disabled={!showKdv}
+                                                className={`w-full bg-transparent border-b py-1.5 text-sm focus:outline-none transition-opacity ${showKdv ? 'opacity-100' : 'opacity-30'} ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} />
                                         </div>
                                         <div>
                                             <label className="text-[10px] opacity-40 block mb-0.5">Durum</label>
@@ -1902,27 +1914,53 @@ export default function AdminDashboard() {
                                                     </button>
                                                 </div>
                                                 <div className="flex gap-3 items-center">
-                                                    <div className="w-16">
-                                                        <label className="text-[8px] uppercase opacity-40 block">Adet</label>
-                                                        <input type="number" value={item.quantity} onChange={e => {
-                                                            const ni = [...(editingProposal.items || [])]; const q = parseFloat(e.target.value) || 0;
-                                                            ni[index].quantity = q; ni[index].total = q * ni[index].unitPrice;
-                                                            const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
-                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <label className="text-[8px] uppercase opacity-40 block">Birim Fiyat</label>
-                                                        <input type="number" value={item.unitPrice} onChange={e => {
-                                                            const ni = [...(editingProposal.items || [])]; const p = parseFloat(e.target.value) || 0;
-                                                            ni[index].unitPrice = p; ni[index].total = ni[index].quantity * p;
-                                                            const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
-                                                            setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
-                                                        }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                        <label className="text-[8px] uppercase opacity-40 block">Toplam</label>
-                                                        <span className="font-bold text-sm" style={{ color: epc }}>{ecs}{item.total.toLocaleString()}</span>
+                                                    {!item.directTotal && (
+                                                        <>
+                                                            <div className="w-16">
+                                                                <label className="text-[8px] uppercase opacity-40 block">Adet</label>
+                                                                <input type="number" value={item.quantity} onChange={e => {
+                                                                    const ni = [...(editingProposal.items || [])]; const q = parseFloat(e.target.value) || 0;
+                                                                    ni[index].quantity = q; ni[index].total = q * ni[index].unitPrice;
+                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
+                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                                }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <label className="text-[8px] uppercase opacity-40 block">Birim Fiyat</label>
+                                                                <input type="number" value={item.unitPrice} onChange={e => {
+                                                                    const ni = [...(editingProposal.items || [])]; const p = parseFloat(e.target.value) || 0;
+                                                                    ni[index].unitPrice = p; ni[index].total = ni[index].quantity * p;
+                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + i.total, 0);
+                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                                }} className={`w-full bg-transparent border-b py-1 text-sm focus:outline-none ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    <div className={item.directTotal ? 'flex-1' : 'text-right shrink-0'}>
+                                                        <div className="flex items-center justify-end gap-1 mb-0.5">
+                                                            <label className="text-[8px] uppercase opacity-40">Toplam</label>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const ni = [...(editingProposal.items || [])];
+                                                                    ni[index].directTotal = !ni[index].directTotal;
+                                                                    const nt = ni.reduce((s: number, i: { total: number }) => s + (i.total || 0), 0);
+                                                                    setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                                }}
+                                                                title={item.directTotal ? 'Birim fiyat ile gir' : 'Direkt toplam gir'}
+                                                                className={`text-[7px] px-1 py-0.5 rounded font-bold transition-all ${item.directTotal ? 'text-white' : 'opacity-30 hover:opacity-60'}`}
+                                                                style={{ background: item.directTotal ? epc : 'transparent', border: `1px solid ${item.directTotal ? epc : 'currentColor'}` }}
+                                                            >✎</button>
+                                                        </div>
+                                                        {item.directTotal ? (
+                                                            <input type="number" value={item.total} onChange={e => {
+                                                                const ni = [...(editingProposal.items || [])]; const t = parseFloat(e.target.value) || 0;
+                                                                ni[index].total = t;
+                                                                const nt = ni.reduce((s: number, i: { total: number }) => s + (i.total || 0), 0);
+                                                                setEditingProposal({ ...editingProposal, items: ni, totalAmount: nt });
+                                                            }} className={`w-full bg-transparent border-b py-1 text-sm font-bold focus:outline-none ${isAdminNight ? 'border-white/10 focus:border-white/30' : 'border-black/10 focus:border-black/30'}`} style={{ color: epc }} />
+                                                        ) : (
+                                                            <span className="font-bold text-sm" style={{ color: epc }}>{ecs}{item.total.toLocaleString()}</span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1936,12 +1974,16 @@ export default function AdminDashboard() {
 
                                     {/* Items Total Summary */}
                                     <div className={`p-3 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
-                                        <div className="flex justify-between text-xs opacity-50 mb-1">
-                                            <span>Ara Toplam</span><span>{eFmt(eSubtotal)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs opacity-50 mb-2">
-                                            <span>KDV (%{eTaxRate})</span><span>{eFmt(eTax)}</span>
-                                        </div>
+                                        {showKdv && (
+                                            <>
+                                                <div className="flex justify-between text-xs opacity-50 mb-1">
+                                                    <span>Ara Toplam</span><span>{eFmt(eSubtotal)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs opacity-50 mb-2">
+                                                    <span>KDV (%{eTaxRate})</span><span>{eFmt(eTax)}</span>
+                                                </div>
+                                            </>
+                                        )}
                                         <div className="flex justify-between font-bold text-sm pt-2 border-t" style={{ borderColor: isAdminNight ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                                             <span>Genel Toplam</span><span style={{ color: epc }}>{eFmt(eTotal)}</span>
                                         </div>
@@ -1997,11 +2039,11 @@ export default function AdminDashboard() {
 
                         {/* RIGHT COLUMN: LIVE A4 PREVIEW */}
                         <div className="flex-1 bg-[#3a3d40] p-6 md:p-10 overflow-y-auto flex justify-center items-start">
-                            <motion.div layoutId="paper-preview" className="bg-white text-black w-full max-w-[210mm] min-h-[297mm] relative shadow-2xl" style={{ transformOrigin: 'top center' }}>
+                            <motion.div layoutId="paper-preview" className="bg-white text-black w-full max-w-[210mm] min-h-[297mm] relative shadow-2xl flex flex-col" style={{ transformOrigin: 'top center' }}>
                                 {/* Top accent bar */}
-                                <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${epc}, ${epc}88, ${epc}44)` }} />
+                                <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${epc}, ${epc}88, ${epc}44)` }} />
 
-                                <div className="px-[50px] pt-[50px] pb-[40px]">
+                                <div className="px-[50px] pt-[50px] pb-[40px] flex-1">
                                     {/* Header */}
                                     <div className="flex justify-between items-start mb-12">
                                         <div className="flex items-center gap-4">
@@ -2027,7 +2069,7 @@ export default function AdminDashboard() {
                                     {/* Client & Project Cards */}
                                     <div className="flex gap-6 mb-10 p-6 rounded-2xl" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                                         <div className="flex-1">
-                                            <div className="text-[9px] font-bold uppercase tracking-[2px] mb-2" style={{ color: epc }}>{editingProposal.preparedForLabel || 'Hazirlanan'}</div>
+                                            <div className="text-[9px] font-bold uppercase tracking-[2px] mb-2" style={{ color: epc }}>{editingProposal.preparedForLabel || 'Firma Adı'}</div>
                                             <div className="text-lg font-bold">{editingProposal.clientName || 'Musteri Adi'}</div>
                                             <div className="text-xs text-gray-400 mt-1">{editingProposal.attnText || ''}</div>
                                         </div>
@@ -2064,14 +2106,18 @@ export default function AdminDashboard() {
                                         {/* Totals */}
                                         <div className="flex justify-end rounded-b-xl overflow-hidden border border-gray-100 border-t-0">
                                             <div className="w-[300px]">
-                                                <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
-                                                    <span className="text-xs text-gray-400">Ara Toplam</span>
-                                                    <span className="text-xs font-semibold">{eFmt(eSubtotal)}</span>
-                                                </div>
-                                                <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
-                                                    <span className="text-xs text-gray-400">KDV (%{eTaxRate})</span>
-                                                    <span className="text-xs font-semibold">{eFmt(eTax)}</span>
-                                                </div>
+                                                {showKdv && (
+                                                    <>
+                                                        <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
+                                                            <span className="text-xs text-gray-400">Ara Toplam</span>
+                                                            <span className="text-xs font-semibold">{eFmt(eSubtotal)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between px-4 py-2.5 border-b border-gray-100">
+                                                            <span className="text-xs text-gray-400">KDV (%{eTaxRate})</span>
+                                                            <span className="text-xs font-semibold">{eFmt(eTax)}</span>
+                                                        </div>
+                                                    </>
+                                                )}
                                                 <div className="flex justify-between px-4 py-3" style={{ background: epc + '08' }}>
                                                     <span className="font-extrabold text-sm">GENEL TOPLAM</span>
                                                     <span className="font-black text-lg" style={{ color: epc }}>{eFmt(eTotal)}</span>
@@ -2112,7 +2158,7 @@ export default function AdminDashboard() {
                                 </div>
 
                                 {/* Bottom accent */}
-                                <div className="h-1" style={{ background: `linear-gradient(90deg, ${epc}44, ${epc}, ${epc}44)` }} />
+                                <div className="h-1 shrink-0" style={{ background: `linear-gradient(90deg, ${epc}44, ${epc}, ${epc}44)` }} />
                             </motion.div>
                         </div>
                     </div>
@@ -2120,6 +2166,13 @@ export default function AdminDashboard() {
                 })()
                 }
 
+                {/* PROPOSAL PRINT MODAL */}
+                {printingProposal && (
+                    <ProposalPrintTemplate
+                        proposal={printingProposal}
+                        onClose={() => setPrintingProposal(null)}
+                    />
+                )}
 
                 {/* DEV STATUS TAB (SYSTEM LOG) */}
                 {

@@ -9,6 +9,7 @@ interface ProposalItem {
     quantity: number;
     unitPrice: number;
     total?: number;
+    directTotal?: boolean;
 }
 
 interface Proposal {
@@ -38,6 +39,7 @@ interface Proposal {
     email?: string;
     address?: string;
     notes?: string;
+    showKdv?: boolean;
 }
 
 interface ProposalPrintTemplateProps {
@@ -50,20 +52,27 @@ export default function ProposalPrintTemplate({ proposal, onClose }: ProposalPri
     const pc = proposal.primaryColor || '#a62932';
     const cs = proposal.currencySymbol || (proposal.currency === 'USD' ? '$' : proposal.currency === 'EUR' ? '€' : '₺');
     const taxRate = proposal.taxRate !== undefined ? proposal.taxRate : 20;
+    const showKdv = proposal.showKdv !== false;
 
-    const subtotal = proposal.items?.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) || proposal.totalAmount;
+    const subtotal = proposal.items?.reduce((sum, item) => sum + (item.directTotal ? (item.total || 0) : item.quantity * item.unitPrice), 0) || proposal.totalAmount;
     const tax = subtotal * (taxRate / 100);
-    const total = subtotal + tax;
+    const total = showKdv ? subtotal + tax : subtotal;
 
     const fmt = (n: number) => `${cs}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const handlePrint = () => {
         const el = printRef.current;
         if (!el) return;
-        const w = window.open('', '_blank');
-        if (!w) return;
 
-        w.document.write(`<!DOCTYPE html><html><head><title>Teklif - ${proposal.title}</title>
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!doc) { document.body.removeChild(iframe); return; }
+
+        doc.open();
+        doc.write(`<!DOCTYPE html><html><head><title>Teklif - ${proposal.title}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -71,9 +80,13 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
 @page{size:A4;margin:0}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>${el.innerHTML}</body></html>`);
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 300);
+        doc.close();
+
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setTimeout(() => document.body.removeChild(iframe), 1000);
+        }, 500);
     };
 
     return (
@@ -99,7 +112,7 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            Yazdir / PDF
+                            Yazdır / PDF
                         </button>
                         <button onClick={onClose} className="p-3 hover:bg-black/5 rounded-xl transition-colors">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,12 +129,13 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                             width: '210mm', minHeight: '297mm', background: '#fff',
                             fontFamily: "'Inter', system-ui, sans-serif", color: '#0f172a',
                             position: 'relative', overflow: 'hidden',
-                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                            display: 'flex', flexDirection: 'column'
                         }}>
                             {/* Decorative top bar */}
-                            <div style={{ height: '6px', background: `linear-gradient(90deg, ${pc}, ${pc}88, ${pc}44)` }} />
+                            <div style={{ height: '6px', background: `linear-gradient(90deg, ${pc}, ${pc}88, ${pc}44)`, flexShrink: 0 }} />
 
-                            <div style={{ padding: '50px 60px 40px' }}>
+                            <div style={{ padding: '50px 60px 40px', flex: 1 }}>
                                 {/* Header: Logo + Proposal Info */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '50px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -163,7 +177,7 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                                 }}>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px', color: pc, marginBottom: '8px' }}>
-                                            {proposal.preparedForLabel || 'Hazirlanan'}
+                                            {proposal.preparedForLabel || 'Firma Adı'}
                                         </div>
                                         <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{proposal.clientName}</div>
                                         <div style={{ fontSize: '13px', color: '#64748b' }}>{proposal.attnText || ''}</div>
@@ -227,14 +241,18 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                                     }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                             <div style={{ width: '320px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
-                                                    <span style={{ fontSize: '13px', color: '#64748b' }}>Ara Toplam</span>
-                                                    <span style={{ fontSize: '13px', fontWeight: 600 }}>{fmt(subtotal)}</span>
-                                                </div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
-                                                    <span style={{ fontSize: '13px', color: '#64748b' }}>KDV (%{taxRate})</span>
-                                                    <span style={{ fontSize: '13px', fontWeight: 600 }}>{fmt(tax)}</span>
-                                                </div>
+                                                {showKdv && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                                        <span style={{ fontSize: '13px', color: '#64748b' }}>Ara Toplam</span>
+                                                        <span style={{ fontSize: '13px', fontWeight: 600 }}>{fmt(subtotal)}</span>
+                                                    </div>
+                                                )}
+                                                {showKdv && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                                        <span style={{ fontSize: '13px', color: '#64748b' }}>KDV (%{taxRate})</span>
+                                                        <span style={{ fontSize: '13px', fontWeight: 600 }}>{fmt(tax)}</span>
+                                                    </div>
+                                                )}
                                                 <div style={{
                                                     display: 'flex', justifyContent: 'space-between', padding: '16px 20px',
                                                     background: `linear-gradient(135deg, ${pc}10, ${pc}05)`
@@ -303,7 +321,7 @@ body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-web
                             </div>
 
                             {/* Bottom accent bar */}
-                            <div style={{ height: '4px', background: `linear-gradient(90deg, ${pc}44, ${pc}, ${pc}44)` }} />
+                            <div style={{ height: '4px', background: `linear-gradient(90deg, ${pc}44, ${pc}, ${pc}44)`, flexShrink: 0 }} />
                         </div>
                     </div>
                 </div>
