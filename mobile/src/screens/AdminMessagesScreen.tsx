@@ -2,15 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
-    ScrollView,
     StyleSheet,
     TouchableOpacity,
     RefreshControl,
     ActivityIndicator,
     StatusBar,
     FlatList,
+    Modal,
+    TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
@@ -29,12 +31,24 @@ interface Conversation {
     unreadCount: number;
 }
 
+interface Account {
+    id: string;
+    name: string;
+    company: string;
+    email: string;
+}
+
 export default function AdminMessagesScreen({ navigation }: Props) {
     const insets = useSafeAreaInsets();
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const pollIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // New conversation modal
+    const [showNewModal, setShowNewModal] = useState(false);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(false);
+    const [searchText, setSearchText] = useState('');
 
     const loadConversations = useCallback(async () => {
         try {
@@ -44,35 +58,61 @@ export default function AdminMessagesScreen({ navigation }: Props) {
             if (result.success && result.data?.data) {
                 setConversations(result.data.data);
             }
-        } catch (error) {
-            console.log('Conversations fetch failed');
+        } catch {
+            // silent
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        loadConversations();
-    }, [loadConversations]);
-
-    // Poll for new messages every 15 seconds
-    useEffect(() => {
-        pollIntervalRef.current = setInterval(() => {
+    // Reload on focus + poll every 15s
+    useFocusEffect(
+        useCallback(() => {
             loadConversations();
-        }, 15000);
-
-        return () => {
-            if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-            }
-        };
-    }, [loadConversations]);
+            const interval = setInterval(loadConversations, 15000);
+            return () => clearInterval(interval);
+        }, [loadConversations])
+    );
 
     const onRefresh = async () => {
         setRefreshing(true);
         await loadConversations();
         setRefreshing(false);
     };
+
+    const openNewModal = async () => {
+        setSearchText('');
+        setShowNewModal(true);
+        setAccountsLoading(true);
+        try {
+            const result = await apiRequest<{ data: Account[] }>('/api/mobile/accounts');
+            if (result.success && result.data?.data) {
+                setAccounts(result.data.data);
+            }
+        } catch {
+            // silent
+        } finally {
+            setAccountsLoading(false);
+        }
+    };
+
+    const handleSelectAccount = (account: Account) => {
+        setShowNewModal(false);
+        navigation.navigate('Chat', {
+            accountId: account.id,
+            companyName: account.company,
+            accountName: account.name,
+        });
+    };
+
+    const filteredAccounts = accounts.filter(acc => {
+        const q = searchText.toLowerCase();
+        return (
+            acc.name.toLowerCase().includes(q) ||
+            acc.company.toLowerCase().includes(q) ||
+            acc.email.toLowerCase().includes(q)
+        );
+    });
 
     const formatTime = (dateStr: string): string => {
         const date = new Date(dateStr);
@@ -87,25 +127,19 @@ export default function AdminMessagesScreen({ navigation }: Props) {
         return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
     };
 
-    const getAvatarLetter = (name: string): string => {
-        return (name && name.length > 0) ? name.charAt(0).toUpperCase() : '?';
-    };
-
-    const handleSelectConversation = (conversation: Conversation) => {
-        navigation.navigate('Chat', {
-            accountId: conversation.accountId,
-            companyName: conversation.companyName,
-            accountName: conversation.accountName,
-        });
-    };
+    const getAvatarLetter = (name: string): string =>
+        name?.charAt(0).toUpperCase() || '?';
 
     const renderConversationCard = ({ item }: { item: Conversation }) => (
         <TouchableOpacity
             style={styles.conversationCard}
-            onPress={() => handleSelectConversation(item)}
+            onPress={() => navigation.navigate('Chat', {
+                accountId: item.accountId,
+                companyName: item.companyName,
+                accountName: item.accountName,
+            })}
             activeOpacity={0.6}
         >
-            {/* Avatar */}
             <View style={styles.avatarContainer}>
                 <View style={styles.avatar}>
                     <Text style={styles.avatarText}>{getAvatarLetter(item.companyName)}</Text>
@@ -119,16 +153,18 @@ export default function AdminMessagesScreen({ navigation }: Props) {
                 )}
             </View>
 
-            {/* Content */}
             <View style={styles.cardContent}>
-                <Text style={styles.companyName}>{item.companyName}</Text>
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                    {item.lastMessage}
+                <View style={styles.cardTop}>
+                    <Text style={styles.companyName} numberOfLines={1}>{item.companyName}</Text>
+                    <Text style={styles.timeText}>{formatTime(item.lastCreatedAt)}</Text>
+                </View>
+                <Text
+                    style={[styles.lastMessage, item.unreadCount > 0 && styles.lastMessageUnread]}
+                    numberOfLines={1}
+                >
+                    {item.lastSenderRole === 'admin' ? 'Siz: ' : ''}{item.lastMessage}
                 </Text>
             </View>
-
-            {/* Time */}
-            <Text style={styles.timeText}>{formatTime(item.lastCreatedAt)}</Text>
         </TouchableOpacity>
     );
 
@@ -136,7 +172,10 @@ export default function AdminMessagesScreen({ navigation }: Props) {
         <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>💬</Text>
             <Text style={styles.emptyTitle}>Henüz Mesaj Yok</Text>
-            <Text style={styles.emptySubtitle}>Müşterilerden gelen mesajlar burada gösterilecek</Text>
+            <Text style={styles.emptySubtitle}>Sağ üstteki + ile müşteriye mesaj başlatabilirsiniz</Text>
+            <TouchableOpacity style={styles.emptyStartBtn} onPress={openNewModal}>
+                <Text style={styles.emptyStartBtnText}>Mesaj Başlat</Text>
+            </TouchableOpacity>
         </View>
     );
 
@@ -151,11 +190,13 @@ export default function AdminMessagesScreen({ navigation }: Props) {
                         <Text style={styles.backButton}>← Geri</Text>
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Mesajlar</Text>
-                    <View style={{ width: 40 }} />
+                    <TouchableOpacity style={styles.newBtn} onPress={openNewModal}>
+                        <Text style={styles.newBtnText}>+</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
-            {/* Content */}
+            {/* Conversation List */}
             {loading && conversations.length === 0 ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator color={COLORS.primary} size="large" />
@@ -174,19 +215,82 @@ export default function AdminMessagesScreen({ navigation }: Props) {
                         />
                     }
                     ListEmptyComponent={renderEmptyState}
-                    scrollEnabled={true}
                     showsVerticalScrollIndicator={false}
                 />
             )}
+
+            {/* New Conversation Modal */}
+            <Modal
+                visible={showNewModal}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowNewModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalSheet, { paddingBottom: insets.bottom + SPACING.md }]}>
+                        {/* Modal Header */}
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Müşteri Seç</Text>
+                            <TouchableOpacity onPress={() => setShowNewModal(false)}>
+                                <Text style={styles.modalClose}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Search */}
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="İsim, şirket veya e-posta..."
+                            placeholderTextColor={COLORS.textMuted}
+                            value={searchText}
+                            onChangeText={setSearchText}
+                            autoFocus
+                        />
+
+                        {/* Account List */}
+                        {accountsLoading ? (
+                            <View style={styles.modalLoading}>
+                                <ActivityIndicator color={COLORS.primary} />
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={filteredAccounts}
+                                keyExtractor={(item) => item.id}
+                                style={styles.accountList}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.accountRow}
+                                        onPress={() => handleSelectAccount(item)}
+                                        activeOpacity={0.6}
+                                    >
+                                        <View style={styles.accountAvatar}>
+                                            <Text style={styles.accountAvatarText}>
+                                                {getAvatarLetter(item.company)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.accountInfo}>
+                                            <Text style={styles.accountCompany}>{item.company}</Text>
+                                            <Text style={styles.accountName}>{item.name}</Text>
+                                        </View>
+                                        <Text style={styles.accountArrow}>→</Text>
+                                    </TouchableOpacity>
+                                )}
+                                ListEmptyComponent={
+                                    <View style={styles.noResults}>
+                                        <Text style={styles.noResultsText}>Müşteri bulunamadı</Text>
+                                    </View>
+                                }
+                                showsVerticalScrollIndicator={false}
+                            />
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: COLORS.background },
     header: {
         backgroundColor: COLORS.surface,
         paddingHorizontal: SPACING.lg,
@@ -199,26 +303,19 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    backButton: {
-        fontSize: FONTS.md,
-        fontWeight: FONTS.medium,
-        color: COLORS.textSecondary,
-    },
-    headerTitle: {
-        fontSize: FONTS.lg,
-        fontWeight: FONTS.bold,
-        color: COLORS.text,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    backButton: { fontSize: FONTS.md, fontWeight: FONTS.medium, color: COLORS.textSecondary },
+    headerTitle: { fontSize: FONTS.lg, fontWeight: FONTS.bold, color: COLORS.text },
+    newBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.primary,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    listContent: {
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
-        flexGrow: 1,
-    },
+    newBtnText: { fontSize: 22, color: COLORS.textInverse, lineHeight: 28 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    listContent: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, flexGrow: 1 },
     conversationCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -229,79 +326,101 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
     },
-    avatarContainer: {
-        position: 'relative',
-        marginRight: SPACING.md,
-    },
+    avatarContainer: { position: 'relative', marginRight: SPACING.md },
     avatar: {
-        width: 56,
-        height: 56,
+        width: 52,
+        height: 52,
         borderRadius: RADIUS.lg,
         backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    avatarText: {
-        fontSize: FONTS.lg,
-        fontWeight: FONTS.bold,
-        color: COLORS.primary,
-    },
+    avatarText: { fontSize: FONTS.lg, fontWeight: FONTS.bold, color: COLORS.primary },
     unreadBadge: {
         position: 'absolute',
         bottom: -4,
         right: -4,
         backgroundColor: COLORS.primary,
         borderRadius: RADIUS.full,
-        minWidth: 24,
-        minHeight: 24,
+        minWidth: 22,
+        minHeight: 22,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
         borderColor: COLORS.surface,
     },
-    unreadBadgeText: {
-        fontSize: FONTS.xs,
-        fontWeight: FONTS.bold,
-        color: COLORS.textInverse,
-        paddingHorizontal: 6,
+    unreadBadgeText: { fontSize: FONTS.xs, fontWeight: FONTS.bold, color: COLORS.textInverse, paddingHorizontal: 4 },
+    cardContent: { flex: 1 },
+    cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+    companyName: { fontSize: FONTS.base, fontWeight: FONTS.bold, color: COLORS.text, flex: 1 },
+    timeText: { fontSize: FONTS.xs, color: COLORS.textMuted, marginLeft: SPACING.sm },
+    lastMessage: { fontSize: FONTS.sm, color: COLORS.textSecondary },
+    lastMessageUnread: { color: COLORS.text, fontWeight: FONTS.semibold },
+    // Empty state
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.lg },
+    emptyIcon: { fontSize: 64, marginBottom: SPACING.md },
+    emptyTitle: { fontSize: FONTS.lg, fontWeight: FONTS.bold, color: COLORS.text, marginBottom: SPACING.sm },
+    emptySubtitle: { fontSize: FONTS.sm, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.xl },
+    emptyStartBtn: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.md,
+        borderRadius: RADIUS.full,
     },
-    cardContent: {
-        flex: 1,
+    emptyStartBtnText: { color: COLORS.textInverse, fontWeight: FONTS.bold, fontSize: FONTS.base },
+    // Modal
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalSheet: {
+        backgroundColor: COLORS.surface,
+        borderTopLeftRadius: RADIUS.xl,
+        borderTopRightRadius: RADIUS.xl,
+        paddingHorizontal: SPACING.lg,
+        paddingTop: SPACING.lg,
+        maxHeight: '80%',
+        minHeight: '60%',
     },
-    companyName: {
-        fontSize: FONTS.md,
-        fontWeight: FONTS.bold,
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.md,
+    },
+    modalTitle: { fontSize: FONTS.lg, fontWeight: FONTS.bold, color: COLORS.text },
+    modalClose: { fontSize: FONTS.lg, color: COLORS.textMuted, padding: SPACING.xs },
+    searchInput: {
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.lg,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm + 2,
+        fontSize: FONTS.base,
         color: COLORS.text,
-        marginBottom: SPACING.xs,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        marginBottom: SPACING.md,
     },
-    lastMessage: {
-        fontSize: FONTS.sm,
-        color: COLORS.textSecondary,
+    modalLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: SPACING.xl },
+    accountList: { flex: 1 },
+    accountRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
-    timeText: {
-        fontSize: FONTS.xs,
-        color: COLORS.textMuted,
-        marginLeft: SPACING.sm,
-    },
-    emptyContainer: {
-        flex: 1,
+    accountAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: RADIUS.md,
+        backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.lg,
+        marginRight: SPACING.md,
     },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: SPACING.lg,
-    },
-    emptyTitle: {
-        fontSize: FONTS.lg,
-        fontWeight: FONTS.bold,
-        color: COLORS.text,
-        marginBottom: SPACING.sm,
-    },
-    emptySubtitle: {
-        fontSize: FONTS.sm,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-    },
+    accountAvatarText: { fontSize: FONTS.md, fontWeight: FONTS.bold, color: COLORS.primary },
+    accountInfo: { flex: 1 },
+    accountCompany: { fontSize: FONTS.base, fontWeight: FONTS.semibold, color: COLORS.text },
+    accountName: { fontSize: FONTS.sm, color: COLORS.textSecondary, marginTop: 2 },
+    accountArrow: { fontSize: FONTS.md, color: COLORS.textMuted },
+    noResults: { paddingVertical: SPACING.xl, alignItems: 'center' },
+    noResultsText: { fontSize: FONTS.base, color: COLORS.textMuted },
 });
