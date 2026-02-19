@@ -8,7 +8,11 @@ import {
     RefreshControl,
     Alert,
     ActivityIndicator,
+    Modal,
+    TextInput,
+    SafeAreaView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS, API_BASE_URL } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
@@ -27,18 +31,33 @@ interface Transaction {
     accountName?: string;
 }
 
+interface Account {
+    id: string;
+    name: string;
+    company: string;
+}
+
 export default function AdminFinanceScreen({ navigation }: Props) {
+    const insets = useSafeAreaInsets();
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'expenses'>('overview');
     const [rates, setRates] = useState({ USD: 34.85, EUR: 37.50 });
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [stats, setStats] = useState({
         revenue: 0,
         expenses: 0,
         profit: 0,
         pending: 0,
     });
+    const [showAddTransactionModal, setShowAddTransactionModal] = useState(false);
+    const [newTransactionType, setNewTransactionType] = useState<'Debt' | 'Payment'>('Payment');
+    const [newTransactionAccountId, setNewTransactionAccountId] = useState('');
+    const [newTransactionAmount, setNewTransactionAmount] = useState('');
+    const [newTransactionDescription, setNewTransactionDescription] = useState('');
+    const [newTransactionDate, setNewTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+    const [submittingTransaction, setSubmittingTransaction] = useState(false);
 
     const fetchRates = async () => {
         try {
@@ -52,9 +71,10 @@ export default function AdminFinanceScreen({ navigation }: Props) {
 
     const loadFinanceData = useCallback(async () => {
         try {
-            const [txResult, dashResult] = await Promise.all([
+            const [txResult, dashResult, accountsResult] = await Promise.all([
                 apiRequest<{ data: Transaction[] }>('/api/mobile/transactions'),
                 apiRequest<{ data: { stats: any } }>('/api/mobile/dashboard'),
+                apiRequest<{ data: Account[] }>('/api/mobile/accounts'),
             ]);
 
             if (txResult.success && txResult.data?.data) {
@@ -69,6 +89,11 @@ export default function AdminFinanceScreen({ navigation }: Props) {
                     profit: s.profit || 0,
                     pending: s.pendingPayments || 0,
                 });
+            }
+
+            if (accountsResult.success && accountsResult.data?.data) {
+                const data = accountsResult.data.data;
+                setAccounts(Array.isArray(data) ? data : []);
             }
         } catch (error) {
             console.log('Finance data fetch failed');
@@ -88,6 +113,54 @@ export default function AdminFinanceScreen({ navigation }: Props) {
         setRefreshing(false);
     };
 
+    const handleAddTransactionPress = () => {
+        setNewTransactionType('Payment');
+        setNewTransactionAccountId('');
+        setNewTransactionAmount('');
+        setNewTransactionDescription('');
+        setNewTransactionDate(new Date().toISOString().split('T')[0]);
+        setShowAddTransactionModal(true);
+    };
+
+    const handleSubmitTransaction = async () => {
+        if (!newTransactionAccountId || !newTransactionAmount) {
+            Alert.alert('Hata', 'Hesap ve tutar gereklidir');
+            return;
+        }
+
+        const amount = parseFloat(newTransactionAmount);
+        if (isNaN(amount) || amount <= 0) {
+            Alert.alert('Hata', 'Geçerli bir tutar girin');
+            return;
+        }
+
+        setSubmittingTransaction(true);
+        try {
+            const result = await apiRequest('/api/mobile/transactions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    accountId: newTransactionAccountId,
+                    type: newTransactionType,
+                    amount,
+                    description: newTransactionDescription.trim(),
+                    date: newTransactionDate,
+                }),
+            });
+
+            if (result.success) {
+                Alert.alert('Başarılı', 'İşlem kaydedildi');
+                setShowAddTransactionModal(false);
+                await loadFinanceData();
+            } else {
+                Alert.alert('Hata', result.error || 'İşlem kaydedilemedi');
+            }
+        } catch (error) {
+            Alert.alert('Hata', 'Bağlantı hatası');
+        } finally {
+            setSubmittingTransaction(false);
+        }
+    };
+
     // Derived data
     const payments = transactions.filter(t => t.type === 'Payment');
     const debts = transactions.filter(t => t.type === 'Debt');
@@ -104,12 +177,14 @@ export default function AdminFinanceScreen({ navigation }: Props) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <Text style={styles.backText}>←</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Finans</Text>
-                <View style={{ width: 44 }} />
+                <TouchableOpacity onPress={handleAddTransactionPress} style={styles.addBtn}>
+                    <Text style={styles.addText}>+</Text>
+                </TouchableOpacity>
             </View>
 
             {/* Exchange Rates */}
@@ -231,6 +306,137 @@ export default function AdminFinanceScreen({ navigation }: Props) {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* Add Transaction Modal */}
+            <Modal visible={showAddTransactionModal} animationType="slide" transparent>
+                <SafeAreaView style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>Yeni İşlem</Text>
+
+                        {/* Transaction Type Selector */}
+                        <Text style={styles.inputLabel}>İŞLEM TİPİ</Text>
+                        <View style={styles.typeSelector}>
+                            {(['Payment', 'Debt'] as const).map(type => (
+                                <TouchableOpacity
+                                    key={type}
+                                    style={[
+                                        styles.typeOption,
+                                        newTransactionType === type && styles.typeOptionActive,
+                                    ]}
+                                    onPress={() => setNewTransactionType(type)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.typeOptionText,
+                                            newTransactionType === type && styles.typeOptionTextActive,
+                                        ]}
+                                    >
+                                        {type === 'Payment' ? 'Ödeme' : 'Borç'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* Account Selector */}
+                        <Text style={styles.inputLabel}>HESAP</Text>
+                        <ScrollView style={styles.accountList} nestedScrollEnabled>
+                            {accounts.length === 0 ? (
+                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, padding: SPACING.md }}>
+                                    Hesap yok
+                                </Text>
+                            ) : (
+                                accounts.map(account => (
+                                    <TouchableOpacity
+                                        key={account.id}
+                                        style={[
+                                            styles.accountOption,
+                                            newTransactionAccountId === account.id && styles.accountOptionActive,
+                                        ]}
+                                        onPress={() => setNewTransactionAccountId(account.id)}
+                                    >
+                                        <View style={styles.accountOptionContent}>
+                                            <Text
+                                                style={[
+                                                    styles.accountOptionName,
+                                                    newTransactionAccountId === account.id && styles.accountOptionNameActive,
+                                                ]}
+                                            >
+                                                {account.company}
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.accountOptionPerson,
+                                                    newTransactionAccountId === account.id && styles.accountOptionPersonActive,
+                                                ]}
+                                            >
+                                                {account.name}
+                                            </Text>
+                                        </View>
+                                        {newTransactionAccountId === account.id && (
+                                            <Text style={{ fontSize: FONTS.md, color: COLORS.primary }}>✓</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+
+                        {/* Amount Input */}
+                        <Text style={styles.inputLabel}>TUTAR (₺)</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="1000"
+                            placeholderTextColor={COLORS.textMuted}
+                            value={newTransactionAmount}
+                            onChangeText={setNewTransactionAmount}
+                            keyboardType="decimal-pad"
+                        />
+
+                        {/* Description Input */}
+                        <Text style={styles.inputLabel}>AÇIKLAMA</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Proje bedeli, ödeme vb."
+                            placeholderTextColor={COLORS.textMuted}
+                            value={newTransactionDescription}
+                            onChangeText={setNewTransactionDescription}
+                            multiline
+                            numberOfLines={3}
+                        />
+
+                        {/* Date Input */}
+                        <Text style={styles.inputLabel}>TARİH</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={COLORS.textMuted}
+                            value={newTransactionDate}
+                            onChangeText={setNewTransactionDate}
+                        />
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.cancelBtn}
+                                onPress={() => setShowAddTransactionModal(false)}
+                                disabled={submittingTransaction}
+                            >
+                                <Text style={styles.cancelBtnText}>İptal</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.submitBtn}
+                                onPress={handleSubmitTransaction}
+                                disabled={submittingTransaction}
+                            >
+                                {submittingTransaction ? (
+                                    <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                ) : (
+                                    <Text style={styles.submitBtnText}>Kaydet</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </SafeAreaView>
+            </Modal>
         </View>
     );
 }
@@ -244,10 +450,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 60,
         paddingBottom: SPACING.md,
         paddingHorizontal: SPACING.lg,
         backgroundColor: COLORS.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
     backBtn: {
         padding: SPACING.sm,
@@ -260,6 +467,19 @@ const styles = StyleSheet.create({
         fontSize: FONTS.lg,
         fontWeight: FONTS.bold,
         color: COLORS.text,
+    },
+    addBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: RADIUS.md,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addText: {
+        fontSize: FONTS.xl,
+        fontWeight: FONTS.bold,
+        color: COLORS.textInverse,
     },
     ratesBar: {
         flexDirection: 'row',
@@ -429,5 +649,147 @@ const styles = StyleSheet.create({
         fontSize: FONTS.md,
         fontWeight: FONTS.bold,
         color: COLORS.error,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: COLORS.surface,
+        borderTopLeftRadius: RADIUS.xl,
+        borderTopRightRadius: RADIUS.xl,
+        padding: SPACING.lg,
+        paddingBottom: SPACING.xxl,
+        maxHeight: '90%',
+    },
+    modalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: COLORS.divider,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: SPACING.lg,
+    },
+    modalTitle: {
+        fontSize: FONTS.xl,
+        fontWeight: FONTS.bold,
+        color: COLORS.text,
+        marginBottom: SPACING.md,
+    },
+    inputLabel: {
+        fontSize: FONTS.xs,
+        fontWeight: FONTS.bold,
+        color: COLORS.textMuted,
+        letterSpacing: 1.5,
+        marginBottom: SPACING.xs,
+    },
+    typeSelector: {
+        flexDirection: 'row',
+        gap: SPACING.md,
+        marginBottom: SPACING.md,
+    },
+    typeOption: {
+        flex: 1,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.sm,
+        borderRadius: RADIUS.md,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+        backgroundColor: COLORS.background,
+        alignItems: 'center',
+    },
+    typeOptionActive: {
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primaryLight,
+    },
+    typeOptionText: {
+        fontSize: FONTS.sm,
+        fontWeight: FONTS.semibold,
+        color: COLORS.textSecondary,
+    },
+    typeOptionTextActive: {
+        color: COLORS.primary,
+        fontWeight: FONTS.bold,
+    },
+    accountList: {
+        maxHeight: 180,
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    accountOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    accountOptionActive: {
+        backgroundColor: COLORS.primaryLight,
+    },
+    accountOptionContent: {
+        flex: 1,
+    },
+    accountOptionName: {
+        fontSize: FONTS.base,
+        fontWeight: FONTS.semibold,
+        color: COLORS.text,
+    },
+    accountOptionNameActive: {
+        color: COLORS.primary,
+    },
+    accountOptionPerson: {
+        fontSize: FONTS.xs,
+        color: COLORS.textSecondary,
+        marginTop: SPACING.xs,
+    },
+    accountOptionPersonActive: {
+        color: COLORS.primary,
+    },
+    input: {
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.md,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.md,
+        fontSize: FONTS.base,
+        color: COLORS.text,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        marginBottom: SPACING.md,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: SPACING.md,
+        marginTop: SPACING.lg,
+    },
+    cancelBtn: {
+        flex: 1,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.divider,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        fontSize: FONTS.base,
+        fontWeight: FONTS.semibold,
+        color: COLORS.text,
+    },
+    submitBtn: {
+        flex: 1,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    submitBtnText: {
+        fontSize: FONTS.base,
+        fontWeight: FONTS.semibold,
+        color: COLORS.textInverse,
     },
 });

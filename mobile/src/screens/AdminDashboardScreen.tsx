@@ -233,6 +233,18 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                         </View>
                         <Text style={styles.cardArrow}>→</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => navigation.navigate('AdminProjects')}
+                        activeOpacity={0.6}
+                    >
+                        <View style={styles.cardLeft}>
+                            <Text style={styles.cardTitle}>Projeler</Text>
+                            <Text style={styles.cardSub}>Durum ve ilerleme</Text>
+                        </View>
+                        <Text style={styles.cardArrow}>→</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Activity Section */}

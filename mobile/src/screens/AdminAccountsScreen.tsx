@@ -10,7 +10,9 @@ import {
     Modal,
     ActivityIndicator,
     RefreshControl,
+    SafeAreaView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
@@ -31,6 +33,7 @@ interface Account {
 }
 
 export default function AdminAccountsScreen({ navigation }: Props) {
+    const insets = useSafeAreaInsets();
     const [showModal, setShowModal] = useState(false);
     const [newName, setNewName] = useState('');
     const [newCompany, setNewCompany] = useState('');
@@ -39,6 +42,13 @@ export default function AdminAccountsScreen({ navigation }: Props) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [transactionMode, setTransactionMode] = useState<'debt' | 'payment' | null>(null);
+    const [transactionAmount, setTransactionAmount] = useState('');
+    const [transactionDescription, setTransactionDescription] = useState('');
+    const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+    const [submittingTransaction, setSubmittingTransaction] = useState(false);
 
     const loadAccounts = useCallback(async () => {
         try {
@@ -103,6 +113,64 @@ export default function AdminAccountsScreen({ navigation }: Props) {
         }
     };
 
+    const handleAccountPress = (account: Account) => {
+        setSelectedAccount(account);
+        setTransactionMode(null);
+        setShowDetailModal(true);
+    };
+
+    const handleTransactionStart = (mode: 'debt' | 'payment') => {
+        setTransactionMode(mode);
+        setTransactionAmount('');
+        setTransactionDescription('');
+        setTransactionDate(new Date().toISOString().split('T')[0]);
+    };
+
+    const handleSubmitTransaction = async () => {
+        if (!transactionAmount || !selectedAccount) {
+            Alert.alert('Hata', 'Tutarı girin');
+            return;
+        }
+
+        const amount = parseFloat(transactionAmount);
+        if (isNaN(amount) || amount <= 0) {
+            Alert.alert('Hata', 'Geçerli bir tutar girin');
+            return;
+        }
+
+        setSubmittingTransaction(true);
+        try {
+            const result = await apiRequest('/api/mobile/transactions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    accountId: selectedAccount.id,
+                    type: transactionMode === 'debt' ? 'Debt' : 'Payment',
+                    amount,
+                    description: transactionDescription.trim(),
+                    date: transactionDate,
+                }),
+            });
+
+            if (result.success) {
+                Alert.alert(
+                    'Başarılı',
+                    `İşlem kaydedildi`
+                );
+                setTransactionMode(null);
+                setTransactionAmount('');
+                setTransactionDescription('');
+                await loadAccounts(); // Refresh accounts list
+                setShowDetailModal(false);
+            } else {
+                Alert.alert('Hata', result.error || 'İşlem kaydedilemedi');
+            }
+        } catch (error) {
+            Alert.alert('Hata', 'Bağlantı hatası');
+        } finally {
+            setSubmittingTransaction(false);
+        }
+    };
+
     const getStatusLabel = (status: string) => {
         switch (status) {
             case 'none': return 'Form Yok';
@@ -122,10 +190,14 @@ export default function AdminAccountsScreen({ navigation }: Props) {
         }
     };
 
+    const calculateBalance = (account: Account) => {
+        return account.balance || (account.totalDebt - account.totalPaid);
+    };
+
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <Text style={styles.backText}>←</Text>
                 </TouchableOpacity>
@@ -149,40 +221,44 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                         <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz hesap yok</Text>
                     </View>
                 ) : (
-                accounts.map(account => {
-                    const statusStyle = getStatusStyle(account.briefStatus || 'none');
-                    return (
-                        <TouchableOpacity
-                            key={account.id}
-                            style={styles.card}
-                            activeOpacity={0.7}
-                            onPress={() => Alert.alert(
-                                account.company || account.name,
-                                `${account.email}\nBakiye: ₺${(account.balance || 0).toLocaleString()}\nDurum: ${getStatusLabel(account.briefStatus || 'none')}`
-                            )}
-                        >
-                            <View style={styles.cardAvatar}>
-                                <Text style={styles.avatarText}>{account.name[0]}</Text>
-                            </View>
-                            <View style={styles.cardContent}>
-                                <Text style={styles.cardName}>{account.name}</Text>
-                                <Text style={styles.cardCompany}>{account.company}</Text>
-                            </View>
-                            <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                                <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                                    {getStatusLabel(account.briefStatus || 'none')}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })
+                    accounts.map(account => {
+                        const statusStyle = getStatusStyle(account.briefStatus || 'none');
+                        const balance = calculateBalance(account);
+                        return (
+                            <TouchableOpacity
+                                key={account.id}
+                                style={styles.card}
+                                activeOpacity={0.7}
+                                onPress={() => handleAccountPress(account)}
+                            >
+                                <View style={styles.cardAvatar}>
+                                    <Text style={styles.avatarText}>{account.name[0]}</Text>
+                                </View>
+                                <View style={styles.cardContent}>
+                                    <Text style={styles.cardName}>{account.name}</Text>
+                                    <Text style={styles.cardCompany}>{account.company}</Text>
+                                    <Text style={[
+                                        styles.cardBalance,
+                                        { color: balance < 0 ? COLORS.error : COLORS.success }
+                                    ]}>
+                                        Bakiye: ₺{Math.abs(balance).toLocaleString('tr-TR')}
+                                    </Text>
+                                </View>
+                                <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                                    <Text style={[styles.statusText, { color: statusStyle.text }]}>
+                                        {getStatusLabel(account.briefStatus || 'none')}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })
                 )}
                 <View style={{ height: 40 }} />
             </ScrollView>
 
-            {/* Modal */}
+            {/* Create Account Modal */}
             <Modal visible={showModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
+                <SafeAreaView style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Yeni Hesap</Text>
@@ -238,7 +314,141 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                             </TouchableOpacity>
                         </View>
                     </View>
-                </View>
+                </SafeAreaView>
+            </Modal>
+
+            {/* Account Detail & Transaction Modal */}
+            <Modal visible={showDetailModal} animationType="slide" transparent>
+                <SafeAreaView style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+
+                        {selectedAccount && !transactionMode && (
+                            <>
+                                <Text style={styles.modalTitle}>{selectedAccount.company}</Text>
+
+                                <View style={styles.detailSection}>
+                                    <Text style={styles.detailLabel}>YETKİLİ</Text>
+                                    <Text style={styles.detailValue}>{selectedAccount.name}</Text>
+                                </View>
+
+                                <View style={styles.detailSection}>
+                                    <Text style={styles.detailLabel}>E-POSTA</Text>
+                                    <Text style={styles.detailValue}>{selectedAccount.email}</Text>
+                                </View>
+
+                                <View style={styles.detailSection}>
+                                    <Text style={styles.detailLabel}>BAKİYE</Text>
+                                    <Text style={[
+                                        styles.detailValue,
+                                        { color: calculateBalance(selectedAccount) < 0 ? COLORS.error : COLORS.success }
+                                    ]}>
+                                        ₺{Math.abs(calculateBalance(selectedAccount)).toLocaleString('tr-TR')}
+                                    </Text>
+                                </View>
+
+                                {selectedAccount.briefStatus && selectedAccount.briefStatus !== 'none' && (
+                                    <View style={styles.detailSection}>
+                                        <Text style={styles.detailLabel}>DURUM</Text>
+                                        <View style={[
+                                            styles.statusBadge,
+                                            { backgroundColor: getStatusStyle(selectedAccount.briefStatus).bg }
+                                        ]}>
+                                            <Text style={[
+                                                styles.statusText,
+                                                { color: getStatusStyle(selectedAccount.briefStatus).text }
+                                            ]}>
+                                                {getStatusLabel(selectedAccount.briefStatus)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+
+                                <View style={styles.actionButtons}>
+                                    <TouchableOpacity
+                                        style={styles.actionBtn}
+                                        onPress={() => handleTransactionStart('debt')}
+                                    >
+                                        <Text style={styles.actionBtnText}>Borç Ekle</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
+                                        onPress={() => handleTransactionStart('payment')}
+                                    >
+                                        <Text style={styles.actionBtnText}>Ödeme Al</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.closeBtn}
+                                    onPress={() => setShowDetailModal(false)}
+                                >
+                                    <Text style={styles.closeBtnText}>Kapat</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                        {selectedAccount && transactionMode && (
+                            <>
+                                <Text style={styles.modalTitle}>
+                                    {transactionMode === 'debt' ? 'Borç Ekle' : 'Ödeme Al'}
+                                </Text>
+                                <Text style={styles.transactionSubtitle}>{selectedAccount.company}</Text>
+
+                                <Text style={styles.inputLabel}>TUTAR (₺)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="1000"
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={transactionAmount}
+                                    onChangeText={setTransactionAmount}
+                                    keyboardType="decimal-pad"
+                                />
+
+                                <Text style={styles.inputLabel}>AÇIKLAMA</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Proje bedeli, ödeme vb."
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={transactionDescription}
+                                    onChangeText={setTransactionDescription}
+                                    multiline
+                                    numberOfLines={3}
+                                />
+
+                                <Text style={styles.inputLabel}>TARİH</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="YYYY-MM-DD"
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={transactionDate}
+                                    onChangeText={setTransactionDate}
+                                />
+
+                                <View style={styles.modalButtons}>
+                                    <TouchableOpacity
+                                        style={styles.cancelBtn}
+                                        onPress={() => setTransactionMode(null)}
+                                        disabled={submittingTransaction}
+                                    >
+                                        <Text style={styles.cancelBtnText}>Geri</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.submitBtn}
+                                        onPress={handleSubmitTransaction}
+                                        disabled={submittingTransaction}
+                                    >
+                                        {submittingTransaction ? (
+                                            <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                        ) : (
+                                            <Text style={styles.submitBtnText}>Kaydet</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        )}
+                    </View>
+                </SafeAreaView>
             </Modal>
         </View>
     );
@@ -253,7 +463,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 60,
         paddingBottom: SPACING.md,
         paddingHorizontal: SPACING.lg,
         backgroundColor: COLORS.surface,
@@ -322,6 +531,12 @@ const styles = StyleSheet.create({
     cardCompany: {
         fontSize: FONTS.sm,
         color: COLORS.textSecondary,
+        marginTop: 2,
+    },
+    cardBalance: {
+        fontSize: FONTS.xs,
+        fontWeight: FONTS.semibold,
+        marginTop: 4,
     },
     statusBadge: {
         paddingHorizontal: SPACING.sm + 2,
@@ -343,6 +558,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: RADIUS.xl,
         padding: SPACING.lg,
         paddingBottom: SPACING.xxl,
+        maxHeight: '90%',
     },
     modalHandle: {
         width: 40,
@@ -356,8 +572,30 @@ const styles = StyleSheet.create({
         fontSize: FONTS.xl,
         fontWeight: FONTS.bold,
         color: COLORS.text,
-        textAlign: 'center',
+        marginBottom: SPACING.md,
+    },
+    transactionSubtitle: {
+        fontSize: FONTS.sm,
+        color: COLORS.textSecondary,
         marginBottom: SPACING.lg,
+    },
+    detailSection: {
+        paddingBottom: SPACING.md,
+        marginBottom: SPACING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    detailLabel: {
+        fontSize: FONTS.xs,
+        fontWeight: FONTS.bold,
+        color: COLORS.textMuted,
+        letterSpacing: 1,
+        marginBottom: SPACING.xs,
+    },
+    detailValue: {
+        fontSize: FONTS.md,
+        fontWeight: FONTS.semibold,
+        color: COLORS.text,
     },
     inputLabel: {
         fontSize: FONTS.xs,
@@ -377,10 +615,27 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
         marginBottom: SPACING.md,
     },
+    actionButtons: {
+        flexDirection: 'row',
+        gap: SPACING.md,
+        marginBottom: SPACING.lg,
+    },
+    actionBtn: {
+        flex: 1,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+    },
+    actionBtnText: {
+        fontSize: FONTS.sm,
+        fontWeight: FONTS.semibold,
+        color: COLORS.textInverse,
+    },
     modalButtons: {
         flexDirection: 'row',
         gap: SPACING.md,
-        marginTop: SPACING.md,
+        marginTop: SPACING.lg,
     },
     cancelBtn: {
         flex: 1,
@@ -400,10 +655,23 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         borderRadius: RADIUS.md,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     submitBtnText: {
         fontSize: FONTS.base,
         fontWeight: FONTS.semibold,
         color: COLORS.textInverse,
+    },
+    closeBtn: {
+        marginTop: SPACING.md,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.divider,
+        borderRadius: RADIUS.md,
+        alignItems: 'center',
+    },
+    closeBtnText: {
+        fontSize: FONTS.base,
+        fontWeight: FONTS.semibold,
+        color: COLORS.text,
     },
 });
