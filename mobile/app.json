@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSFaceIDUsageDescription": "Hızlı giriş için Face ID kullanın",
         "NSCameraUsageDescription": "Fotoğraf çekmek için kamera erişimi gereklidir",
-        "NSPhotoLibraryUsageDescription": "PDF ve dosya paylaşımı için galeri erişimi gereklidir"
+        "NSPhotoLibraryUsageDescription": "PDF ve dosya paylaşımı için galeri erişimi gereklidir",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -34,7 +35,9 @@
         "USE_FINGERPRINT",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "SCHEDULE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -60,7 +63,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "3664a97e-8ab0-4f3e-8507-f21e6d993539"
       }
     }
   }

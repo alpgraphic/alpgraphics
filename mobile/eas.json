@@ -28,9 +28,7 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "alpgraphicstudio@gmail.com",
-        "ascAppId": "",
-        "appleTeamId": ""
+        "appleId": "alpgraphicstudio@gmail.com"
       }
     }
   }
