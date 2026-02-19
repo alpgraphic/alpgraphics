@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { logout, apiRequest } from '../lib/auth';
+import { registerForPushNotifications } from '../lib/notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -76,6 +77,8 @@ export default function AdminDashboardScreen({ navigation }: Props) {
 
     useEffect(() => {
         loadDashboard();
+        // Register for push notifications
+        registerForPushNotifications().catch(console.error);
     }, [loadDashboard]);
 
     const onRefresh = async () => {
@@ -242,6 +245,30 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                         <View style={styles.cardLeft}>
                             <Text style={styles.cardTitle}>Projeler</Text>
                             <Text style={styles.cardSub}>Durum ve ilerleme</Text>
+                        </View>
+                        <Text style={styles.cardArrow}>→</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => navigation.navigate('AdminMessages')}
+                        activeOpacity={0.6}
+                    >
+                        <View style={styles.cardLeft}>
+                            <Text style={styles.cardTitle}>Mesajlar</Text>
+                            <Text style={styles.cardSub}>Müşterilerle iletişim</Text>
+                        </View>
+                        <Text style={styles.cardArrow}>→</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => navigation.navigate('Planner')}
+                        activeOpacity={0.6}
+                    >
+                        <View style={styles.cardLeft}>
+                            <Text style={styles.cardTitle}>Planlayıcı</Text>
+                            <Text style={styles.cardSub}>Günlük görev listesi</Text>
                         </View>
                         <Text style={styles.cardArrow}>→</Text>
                     </TouchableOpacity>

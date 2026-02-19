@@ -150,6 +150,23 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Notify admin that a brief was submitted
+        try {
+            const { getAdminTokens, sendPushNotification } = await import('@/lib/pushNotifications');
+            const adminTokens = await getAdminTokens();
+            if (adminTokens.length > 0) {
+                const acc = await accounts.findOne({ _id: new ObjectId(clientId) } as any);
+                const company = (acc as any)?.company || (acc as any)?.name || 'Bir müşteri';
+                await sendPushNotification(adminTokens, {
+                    title: 'Yeni Brief Gönderildi',
+                    body: `${company} briefini doldurdu, incelemeye hazır.`,
+                    data: { type: 'brief', accountId: clientId },
+                });
+            }
+        } catch (notifErr) {
+            console.error('Brief notification error:', notifErr);
+        }
+
         return NextResponse.json({
             success: true,
             message: 'Brief başarıyla gönderildi',

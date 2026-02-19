@@ -184,6 +184,66 @@ export async function getTransactionsCollection(): Promise<Collection<DbTransact
     return db.collection<DbTransaction>('transactions');
 }
 
+// ─── Messages ─────────────────────────────────────────────────────────────────
+export interface DbMessage {
+    _id?: string;
+    accountId: string;      // the client account ID (common thread)
+    senderId: string;
+    senderRole: 'admin' | 'client';
+    senderName: string;
+    content: string;
+    createdAt: Date;
+    readAt?: Date;
+}
+
+export async function getMessagesCollection(): Promise<Collection<DbMessage>> {
+    const db = await getDb();
+    return db.collection<DbMessage>('messages');
+}
+
+// ─── Planner Tasks ────────────────────────────────────────────────────────────
+export interface DbPlannerTask {
+    _id?: string;
+    userId: string;
+    title: string;
+    notes?: string;
+    date: string;           // YYYY-MM-DD — which day
+    startTime?: string;     // HH:MM
+    dueTime?: string;       // HH:MM — deadline for reminder
+    isCompleted: boolean;
+    completedAt?: Date;
+    priority: 'high' | 'normal' | 'low';
+    color?: string;
+    isBreak: boolean;
+    duration?: number;      // minutes (for break blocks)
+    order: number;
+    repeatDaily: boolean;
+    projectTag?: string;    // optional client/project label
+    estimatedMinutes?: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export async function getPlannerTasksCollection(): Promise<Collection<DbPlannerTask>> {
+    const db = await getDb();
+    return db.collection<DbPlannerTask>('planner_tasks');
+}
+
+// ─── Push Tokens ──────────────────────────────────────────────────────────────
+export interface DbPushToken {
+    _id?: string;
+    userId: string;
+    role: 'admin' | 'client';
+    token: string;
+    platform?: string;
+    updatedAt: Date;
+}
+
+export async function getPushTokensCollection(): Promise<Collection<DbPushToken>> {
+    const db = await getDb();
+    return db.collection<DbPushToken>('push_tokens');
+}
+
 // Session Management
 export interface DbSession {
     _id?: string;

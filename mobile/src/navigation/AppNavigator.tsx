@@ -13,6 +13,9 @@ import AdminBriefsScreen from '../screens/AdminBriefsScreen';
 import AdminFinanceScreen from '../screens/AdminFinanceScreen';
 import AdminProposalsScreen from '../screens/AdminProposalsScreen';
 import AdminProjectsScreen from '../screens/AdminProjectsScreen';
+import AdminMessagesScreen from '../screens/AdminMessagesScreen';
+import ChatScreen from '../screens/ChatScreen';
+import PlannerScreen from '../screens/PlannerScreen';
 
 import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
@@ -28,7 +31,14 @@ export type RootStackParamList = {
     AdminFinance: undefined;
     AdminProposals: undefined;
     AdminProjects: undefined;
+    AdminMessages: undefined;
+    Chat: { accountId: string; companyName?: string; accountName?: string };
+    Planner: undefined;
     BriefForm: undefined;
+};
+
+type Props = {
+    onAuthenticated?: () => void;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -41,7 +51,7 @@ function LoadingScreen() {
     );
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ onAuthenticated }: Props) {
     const [isReady, setIsReady] = useState(false);
     const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Welcome');
     const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
@@ -57,7 +67,8 @@ export default function AppNavigator() {
                     } else if (userData?.role) {
                         setInitialRoute('Dashboard');
                     }
-                    // If authenticated, skip Welcome and Login
+                    // Trigger push notification registration
+                    onAuthenticated?.();
                 }
             } catch {
                 // Default to Welcome on any error
@@ -127,6 +138,15 @@ export default function AppNavigator() {
                 <Stack.Screen name="AdminFinance" component={AdminFinanceScreen} />
                 <Stack.Screen name="AdminProposals" component={AdminProposalsScreen} />
                 <Stack.Screen name="AdminProjects" component={AdminProjectsScreen} />
+                <Stack.Screen name="AdminMessages" component={AdminMessagesScreen} />
+                <Stack.Screen name="Planner" component={PlannerScreen} />
+
+                {/* Shared Screens */}
+                <Stack.Screen
+                    name="Chat"
+                    component={ChatScreen}
+                    options={{ animation: 'slide_from_right' }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );

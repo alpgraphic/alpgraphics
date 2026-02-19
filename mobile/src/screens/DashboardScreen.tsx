@@ -12,6 +12,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { logout, apiRequest, isBiometricAvailable, authenticateWithBiometric } from '../lib/auth';
+import { registerForPushNotifications } from '../lib/notifications';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -91,6 +92,8 @@ export default function DashboardScreen({ navigation }: Props) {
     useEffect(() => {
         isBiometricAvailable().then(setBiometricEnabled);
         loadData();
+        // Register for push notifications
+        registerForPushNotifications().catch(console.error);
     }, [loadData]);
 
     const onRefresh = async () => {
@@ -248,6 +251,19 @@ export default function DashboardScreen({ navigation }: Props) {
                         ))}
                     </View>
                 )}
+
+                {/* Messages Card */}
+                <TouchableOpacity
+                    style={styles.actionCard}
+                    onPress={() => navigation.navigate('Chat', { accountId: '', companyName: 'alpgraphics', accountName: 'Destek' })}
+                >
+                    <Text style={styles.actionIcon}>💬</Text>
+                    <View style={styles.actionInfo}>
+                        <Text style={styles.actionTitle}>Mesajlar</Text>
+                        <Text style={styles.actionDesc}>alpgraphics ekibiyle iletişime geçin</Text>
+                    </View>
+                    <Text style={styles.actionArrow}>→</Text>
+                </TouchableOpacity>
 
                 {/* Info Cards */}
                 <View style={styles.infoGrid}>
