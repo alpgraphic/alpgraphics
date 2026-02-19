@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { apiRequest } from './auth';
 
-// Configure notification behavior
+// Configure notification behavior (works for local notifications in Expo Go too)
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -15,18 +15,19 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Request notification permissions and get Expo push token.
- * Saves token to server automatically.
+ * Request notification permissions and optionally get Expo push token.
+ * Remote push token requires a production/development build (not Expo Go).
+ * Local notifications (planner reminders) work in both Expo Go and production.
  */
 export async function registerForPushNotifications(): Promise<string | null> {
-    // Only works on real devices
+    // Only request permissions on real devices
     if (!Device.isDevice) {
         console.log('Push notifications require a physical device.');
         return null;
     }
 
     try {
-        // Check existing permissions
+        // Request permissions (local notifications work in Expo Go)
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
 
@@ -36,11 +37,11 @@ export async function registerForPushNotifications(): Promise<string | null> {
         }
 
         if (finalStatus !== 'granted') {
-            console.log('Notification permission denied.');
+            // Not an error — user may have denied. Local notifs also won't work.
             return null;
         }
 
-        // Android channel setup
+        // Android notification channel setup
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'Genel Bildirimler',
@@ -59,18 +60,22 @@ export async function registerForPushNotifications(): Promise<string | null> {
             });
         }
 
-        // Get the Expo push token
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: undefined, // Will use app.json projectId if configured
-        });
-        const token = tokenData.data;
-
-        // Save token to server
-        await saveTokenToServer(token);
-
-        return token;
+        // Try to get remote push token — only works in production/dev builds,
+        // NOT in Expo Go (fails with projectId or SDK error). We catch gracefully.
+        try {
+            const tokenData = await Notifications.getExpoPushTokenAsync();
+            const token = tokenData.data;
+            // Save token to server for remote push notifications
+            await saveTokenToServer(token);
+            return token;
+        } catch {
+            // Expected in Expo Go — local notifications still work fine.
+            // Remote push (briefs/messages) will work once app is in production build.
+            console.log('Remote push token unavailable (Expo Go or missing projectId). Local notifications still active.');
+            return null;
+        }
     } catch (error) {
-        console.error('Failed to register for push notifications:', error);
+        console.error('Failed to set up notifications:', error);
         return null;
     }
 }
@@ -97,14 +102,15 @@ async function saveTokenToServer(token: string): Promise<void> {
  */
 export async function removePushToken(): Promise<void> {
     try {
-        const tokenData = await Notifications.getExpoPushTokenAsync({}).catch(() => null);
+        // getExpoPushTokenAsync throws in Expo Go — handle gracefully
+        const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
         if (tokenData?.data) {
             await apiRequest(`/api/mobile/push-token?token=${encodeURIComponent(tokenData.data)}`, {
                 method: 'DELETE',
             });
         }
-    } catch (error) {
-        console.error('Failed to remove push token:', error);
+    } catch {
+        // Ignore — token might not exist or we're in Expo Go
     }
 }
 

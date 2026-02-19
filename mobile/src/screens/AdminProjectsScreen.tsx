@@ -9,7 +9,6 @@ import {
     Alert,
     Modal,
     TextInput,
-    SafeAreaView,
     ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -226,7 +225,7 @@ export default function AdminProjectsScreen({ navigation }: Props) {
 
             {/* Edit Project Modal */}
             <Modal visible={showEditModal} animationType="slide" transparent>
-                <SafeAreaView style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
 
@@ -305,7 +304,7 @@ export default function AdminProjectsScreen({ navigation }: Props) {
                             </>
                         )}
                     </View>
-                </SafeAreaView>
+                </View>
             </Modal>
         </View>
     );

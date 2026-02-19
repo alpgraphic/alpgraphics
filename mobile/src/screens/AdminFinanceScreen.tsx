@@ -10,7 +10,6 @@ import {
     ActivityIndicator,
     Modal,
     TextInput,
-    SafeAreaView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -309,7 +308,7 @@ export default function AdminFinanceScreen({ navigation }: Props) {
 
             {/* Add Transaction Modal */}
             <Modal visible={showAddTransactionModal} animationType="slide" transparent>
-                <SafeAreaView style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Yeni İşlem</Text>
@@ -435,7 +434,7 @@ export default function AdminFinanceScreen({ navigation }: Props) {
                             </TouchableOpacity>
                         </View>
                     </View>
-                </SafeAreaView>
+                </View>
             </Modal>
         </View>
     );

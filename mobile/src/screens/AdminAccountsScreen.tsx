@@ -10,7 +10,6 @@ import {
     Modal,
     ActivityIndicator,
     RefreshControl,
-    SafeAreaView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -258,7 +257,7 @@ export default function AdminAccountsScreen({ navigation }: Props) {
 
             {/* Create Account Modal */}
             <Modal visible={showModal} animationType="slide" transparent>
-                <SafeAreaView style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Yeni Hesap</Text>
@@ -314,12 +313,12 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                             </TouchableOpacity>
                         </View>
                     </View>
-                </SafeAreaView>
+                </View>
             </Modal>
 
             {/* Account Detail & Transaction Modal */}
             <Modal visible={showDetailModal} animationType="slide" transparent>
-                <SafeAreaView style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
 
@@ -448,7 +447,7 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                             </>
                         )}
                     </View>
-                </SafeAreaView>
+                </View>
             </Modal>
         </View>
     );

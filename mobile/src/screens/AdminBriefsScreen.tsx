@@ -9,7 +9,6 @@ import {
     ActivityIndicator,
     RefreshControl,
     Modal,
-    SafeAreaView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -273,7 +272,7 @@ export default function AdminBriefsScreen({ navigation }: Props) {
 
             {/* Detail Modal */}
             <Modal visible={showDetailModal} animationType="slide" transparent>
-                <SafeAreaView style={styles.modalOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHandle} />
 
@@ -322,7 +321,7 @@ export default function AdminBriefsScreen({ navigation }: Props) {
                             </>
                         )}
                     </View>
-                </SafeAreaView>
+                </View>
             </Modal>
         </View>
     );
