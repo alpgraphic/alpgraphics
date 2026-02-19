@@ -18,6 +18,18 @@ export function middleware(request: NextRequest) {
         "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data: blob:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors 'none';"
     );
 
+    // ─── CORS (For Mobile) ───
+    if (path.startsWith('/api/mobile/')) {
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+        // Handle CORS Preflight completely
+        if (method === 'OPTIONS') {
+            return new NextResponse(null, { status: 204, headers: response.headers });
+        }
+    }
+
     // ─── ORIGIN CHECK (CSRF Protection via Origin/Referer) ───
     // Protects state-changing API requests from cross-origin attacks
     if (path.startsWith('/api/') && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
