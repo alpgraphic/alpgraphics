@@ -84,6 +84,31 @@ export const TOKEN_KEYS = {
 };
 
 // Development API URL
-export const API_BASE_URL = __DEV__
-    ? 'http://192.168.1.90:3000'
-    : 'https://alpgraphics.com';
+// In dev: auto-detect host IP from Expo's Metro bundler (works even when IP changes)
+// In prod: use the live domain
+function getApiBaseUrl(): string {
+    if (!__DEV__) return 'https://alpgraphics.com';
+
+    try {
+        // expo-constants gives us the Metro host, e.g. "192.168.1.x:8081"
+        // We replace the Metro port with the Next.js dev server port (3000)
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const Constants = require('expo-constants').default;
+        const expoHost: string | undefined =
+            Constants.expoConfig?.hostUri ??   // Expo Go / SDK 49+
+            Constants.manifest2?.launchAsset?.url ?? // EAS Update fallback
+            Constants.manifest?.debuggerHost; // older SDK fallback
+
+        if (expoHost) {
+            const ip = expoHost.split(':')[0]; // strip the Metro port
+            return `http://${ip}:3000`;
+        }
+    } catch {
+        // expo-constants not available — fall through to hardcoded
+    }
+
+    // Fallback: update this IP if auto-detect ever fails
+    return 'http://192.168.1.137:3000';
+}
+
+export const API_BASE_URL = getApiBaseUrl();
