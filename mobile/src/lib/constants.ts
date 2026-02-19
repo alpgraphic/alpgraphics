@@ -87,7 +87,7 @@ export const TOKEN_KEYS = {
 // In dev: auto-detect host IP from Expo's Metro bundler (works even when IP changes)
 // In prod: use the live domain
 function getApiBaseUrl(): string {
-    if (!__DEV__) return 'https://alpgraphicstudio.com';
+    if (!__DEV__) return 'https://www.alpgraphicstudio.com';
 
     try {
         // expo-constants gives us the Metro host, e.g. "192.168.1.x:8081"
