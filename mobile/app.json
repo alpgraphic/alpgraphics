@@ -13,11 +13,13 @@
       "backgroundColor": "#f5f3e9"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.alpgraphics.client",
       "buildNumber": "1",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Hizli giris icin Face ID kullanin"
+        "NSFaceIDUsageDescription": "Hızlı giriş için Face ID kullanın",
+        "NSCameraUsageDescription": "Fotoğraf çekmek için kamera erişimi gereklidir",
+        "NSPhotoLibraryUsageDescription": "PDF ve dosya paylaşımı için galeri erişimi gereklidir"
       }
     },
     "android": {
@@ -29,7 +31,10 @@
       "versionCode": 1,
       "permissions": [
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM"
       ]
     },
     "web": {
@@ -39,10 +44,19 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Hizli giris icin Face ID kullanin"
+          "faceIDPermission": "Hızlı giriş için Face ID kullanın"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#a62932",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ]
     ],
     "extra": {
       "eas": {
