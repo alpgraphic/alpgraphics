@@ -17,6 +17,8 @@ import AdminMessagesScreen from '../screens/AdminMessagesScreen';
 import ChatScreen from '../screens/ChatScreen';
 import PlannerScreen from '../screens/PlannerScreen';
 import BriefFormScreen from '../screens/BriefFormScreen';
+import GameScreen from '../screens/GameScreen';
+import ChromaDashScreen from '../screens/ChromaDashScreen';
 
 import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
@@ -36,6 +38,8 @@ export type RootStackParamList = {
     Chat: { accountId: string; companyName?: string; accountName?: string };
     Planner: undefined;
     BriefForm: { briefId?: string; isReadOnly?: boolean } | undefined;
+    Game: undefined;
+    ChromaDash: undefined;
 };
 
 type Props = {
@@ -156,6 +160,18 @@ export default function AppNavigator({ onAuthenticated }: Props) {
                 <Stack.Screen name="AdminProjects" component={AdminProjectsScreen} />
                 <Stack.Screen name="AdminMessages" component={AdminMessagesScreen} />
                 <Stack.Screen name="Planner" component={PlannerScreen} />
+
+                {/* Gizli Oyunlar 🎨 */}
+                <Stack.Screen
+                    name="Game"
+                    component={GameScreen}
+                    options={{ animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen
+                    name="ChromaDash"
+                    component={ChromaDashScreen}
+                    options={{ animation: 'slide_from_bottom' }}
+                />
 
                 {/* Shared Screens */}
                 <Stack.Screen

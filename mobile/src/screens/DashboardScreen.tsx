@@ -265,22 +265,36 @@ export default function DashboardScreen({ navigation }: Props) {
                     <Text style={styles.actionArrow}>→</Text>
                 </TouchableOpacity>
 
-                {/* Gizli Oyun Kartı 🎨 */}
-                <TouchableOpacity
-                    style={styles.gameCard}
-                    onPress={() => navigation.navigate('Game')}
-                    activeOpacity={0.8}
-                >
-                    <View style={styles.gameDotsRow}>
-                        {[0, 51, 103, 154, 205, 257, 308].map((h, i) => (
-                            <View key={i} style={[styles.gameDot, { backgroundColor: `hsl(${h}, 70%, 55%)` }]} />
-                        ))}
-                    </View>
-                    <View style={styles.gameCardInfo}>
+                {/* Oyunlar 🎨 */}
+                <View style={styles.gamesRow}>
+                    <TouchableOpacity
+                        style={[styles.gameCard, { flex: 1 }]}
+                        onPress={() => navigation.navigate('Game')}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.gameDotsRow}>
+                            {[0, 51, 103, 154, 205, 257, 308].map((h, i) => (
+                                <View key={i} style={[styles.gameDot, { backgroundColor: `hsl(${h}, 70%, 55%)` }]} />
+                            ))}
+                        </View>
                         <Text style={styles.gameCardTitle}>Renk Ustası</Text>
-                        <Text style={styles.gameCardDesc}>Renk algını test et →</Text>
-                    </View>
-                </TouchableOpacity>
+                        <Text style={styles.gameCardDesc}>Renk algını test et</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.gameCard, styles.gameCardDark, { flex: 1 }]}
+                        onPress={() => navigation.navigate('ChromaDash')}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.gameDotsRow}>
+                            {['#00e5ff', '#ff2d78', '#ffe000', '#39ff6a'].map((c, i) => (
+                                <View key={i} style={[styles.gameDot, { backgroundColor: c }]} />
+                            ))}
+                        </View>
+                        <Text style={[styles.gameCardTitle, { color: '#00e5ff' }]}>Chroma Dash</Text>
+                        <Text style={styles.gameCardDesc}>Reflekslerini test et</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* Info Cards */}
                 <View style={styles.infoGrid}>
@@ -525,39 +539,43 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.text,
     },
-    // Game card
+    // Game cards
+    gamesRow: {
+        flexDirection: 'row',
+        gap: SPACING.sm,
+        marginBottom: SPACING.md,
+    },
     gameCard: {
         backgroundColor: COLORS.white,
         borderRadius: 16,
         padding: SPACING.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.md,
+        flexDirection: 'column',
         borderWidth: 1,
         borderColor: COLORS.border,
+    },
+    gameCardDark: {
+        backgroundColor: '#0e0e18',
+        borderColor: 'rgba(0,229,255,0.15)',
     },
     gameDotsRow: {
         flexDirection: 'row',
         gap: 4,
-        marginRight: SPACING.md,
+        marginBottom: SPACING.sm,
     },
     gameDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-    },
-    gameCardInfo: {
-        flex: 1,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
     },
     gameCardTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '700',
         color: COLORS.text,
+        marginBottom: 2,
     },
     gameCardDesc: {
-        fontSize: 12,
+        fontSize: 11,
         color: COLORS.textLight,
-        marginTop: 2,
     },
     // Balance card
     balanceCard: {

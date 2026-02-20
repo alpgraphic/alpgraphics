@@ -143,9 +143,34 @@ export default function LoginScreen({ navigation }: Props) {
             </KeyboardAvoidingView>
 
             {/* Footer */}
-            <Text style={[styles.footer, { paddingBottom: insets.bottom + SPACING.md }]}>
-                © 2026 alpgraphics
-            </Text>
+            <View style={[styles.footerRow, { paddingBottom: insets.bottom + SPACING.md }]}>
+                <Text style={styles.footer}>© 2026 alpgraphics</Text>
+                {/* Gizli oyun girişleri 🎨 */}
+                <View style={styles.gameHints}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Game')}
+                        activeOpacity={0.4}
+                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                    >
+                        <View style={styles.gameHint}>
+                            {['#e07060', '#60a0e0', '#70c870'].map((c, i) => (
+                                <View key={i} style={[styles.gameHintDot, { backgroundColor: c }]} />
+                            ))}
+                        </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('ChromaDash')}
+                        activeOpacity={0.4}
+                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                    >
+                        <View style={styles.gameHint}>
+                            {['#00e5ff', '#ff2d78', '#ffe000', '#39ff6a'].map((c, i) => (
+                                <View key={i} style={[styles.gameHintDot, { backgroundColor: c }]} />
+                            ))}
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </View>
         </View>
     );
 }
@@ -240,9 +265,30 @@ const styles = StyleSheet.create({
         fontSize: FONTS.sm,
         color: COLORS.textMuted,
     },
+    footerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: SPACING.lg,
+    },
     footer: {
         fontSize: FONTS.xs,
         color: COLORS.textMuted,
-        textAlign: 'center',
+    },
+    gameHints: {
+        flexDirection: 'row',
+        gap: 10,
+        alignItems: 'center',
+    },
+    gameHint: {
+        flexDirection: 'row',
+        gap: 4,
+        alignItems: 'center',
+    },
+    gameHintDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        opacity: 0.6,
     },
 });
