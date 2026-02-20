@@ -1,8 +1,9 @@
 /**
- * Chroma Dash v3 — Tasarımcı Renk Refleks Eğitimi
+ * Chroma Dash v4 — Gerçek Veritabanı Liderlik Tablosu
  *
  * Takım arkadaşlarınla yarış, kupa kazan, unvan yükselt.
  * Geometry Dash × Color Switch mekanik harmanlama.
+ * Skorlar MongoDB'ye kaydedilir; liderlik tablosu gerçek zamanlı.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -17,6 +18,7 @@ import {
     Dimensions,
     StatusBar,
     Animated,
+    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
@@ -24,7 +26,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { SPACING } from '../lib/constants';
+import { SPACING, API_BASE_URL } from '../lib/constants';
+import { validateUsername } from '../lib/profanityFilter';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,12 @@ interface Band    { color: string; y: number; h: number }
 interface Obs     { id: number; x: number; bands: Band[]; safeColor: string; passed: boolean }
 interface Orb     { id: number; x: number; y: number; color: string }
 interface LBEntry { score: number; rankLabel: string }
+
+interface GlobalLBEntry {
+    rank:     number;
+    username: string;
+    score:    number;
+}
 
 interface GS {
     phase:         Phase;
@@ -89,16 +98,6 @@ const USERNAME_KEY = 'chroma_dash_username_v1';
 const TROPHY_KEY   = 'chroma_dash_trophies_v1';
 const STATS_KEY    = 'chroma_dash_stats_v1';
 
-// ─── Takım rakipleri ──────────────────────────────────────────────────────────
-
-const PRESET_TEAM: { name: string; score: number }[] = [
-    { name: 'alp',     score: 58 },
-    { name: 'selin',   score: 43 },
-    { name: 'stüdyo',  score: 29 },
-    { name: 'asistan', score: 14 },
-    { name: 'acemi',   score:  7 },
-];
-
 // ─── Kupa Sistemi ─────────────────────────────────────────────────────────────
 
 interface TrophyDef {
@@ -117,7 +116,7 @@ const TROPHIES: TrophyDef[] = [
     { id: 'god',        emoji: '🌈', name: 'Renk Tanrısı', desc: '50+ puan al',                  check: (s)       => s >= 50            },
     { id: 'veteran',    emoji: '🔥', name: 'Veteran',      desc: '10 kez oyna',                  check: (_s, st) => st.totalGames >= 10 },
     { id: 'orbmaster',  emoji: '💫', name: 'Orb Ustası',   desc: 'Toplam 30 orb topla',          check: (_s, st) => st.totalOrbs >= 30  },
-    { id: 'beat_selin', emoji: '🏅', name: "Selin'i Geç",  desc: "Selin'in skorunu geç (44+)",   check: (s)       => s >= 44            },
+    { id: 'top3',       emoji: '🏆', name: 'Podiyum',      desc: 'Liderlik tablosunda ilk 3\'e gir', check: (_s, st) => st.maxScore >= 1 },
 ];
 
 // ─── Unvan Sistemi ────────────────────────────────────────────────────────────
@@ -146,11 +145,26 @@ function rankProgress(score: number): number {
     if (!next) return 1;
     return Math.min(1, (score - cur.min) / (next.min - cur.min));
 }
-function buildMixedLB(playerName: string, playerScore: number): MixedEntry[] {
-    return [
-        ...PRESET_TEAM.map(t => ({ name: t.name, score: t.score, isPlayer: false })),
+
+// Build display LB: merge globalLB with player's current score, highlight player
+function buildMixedLB(
+    playerName: string,
+    playerScore: number,
+    globalLB: GlobalLBEntry[]
+): MixedEntry[] {
+    const playerNameLower = playerName.toLowerCase();
+
+    // Remove player's existing entry from global LB (we'll re-insert with current score)
+    const others = globalLB
+        .filter(e => e.username.toLowerCase() !== playerNameLower)
+        .map(e => ({ name: e.username, score: e.score, isPlayer: false }));
+
+    const all: MixedEntry[] = [
+        ...others,
         { name: playerName, score: playerScore, isPlayer: true },
-    ].sort((a, b) => b.score - a.score);
+    ];
+
+    return all.sort((a, b) => b.score - a.score);
 }
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -214,9 +228,12 @@ export default function ChromaDashScreen({ navigation }: Props) {
     // Temel UI state
     const [,               setTick]          = useState(0);
     const [leaderboard,    setLeaderboard]   = useState<LBEntry[]>([]);
+    const [globalLB,       setGlobalLB]      = useState<GlobalLBEntry[]>([]);
+    const [lbLoading,      setLbLoading]     = useState(false);
     const [countdown,      setCountdown]     = useState(3);
     const [username,       setUsername]      = useState<string | null>(null);
     const [usernameInput,  setUsernameInput] = useState('');
+    const [usernameError,  setUsernameError] = useState<string | null>(null);
     const [earnedTrophies, setEarnedTrophies]= useState<Set<string>>(new Set());
     const [stats,          setStats]         = useState<Stats>({ totalGames: 0, maxScore: 0, totalOrbs: 0 });
     const [newTrophies,    setNewTrophies]   = useState<TrophyDef[]>([]);
@@ -224,8 +241,8 @@ export default function ChromaDashScreen({ navigation }: Props) {
     // Ölüm ekranı için zenginleştirilmiş state
     const [displayScore,   setDisplayScore]  = useState(0);
     const [isNewRecord,    setIsNewRecord]   = useState(false);
-    const [beatenRival,    setBeatenRival]   = useState<string | null>(null); // En yüksek geçilen rakip
-    const [lbPosition,     setLbPosition]   = useState(0); // Karışık tablodaki sıra (1-tabanlı)
+    const [beatenRival,    setBeatenRival]   = useState<string | null>(null);
+    const [lbPosition,     setLbPosition]   = useState(0);
 
     // Refs
     const rafRef        = useRef<number | null>(null);
@@ -242,6 +259,37 @@ export default function ChromaDashScreen({ navigation }: Props) {
     });
     gsRef.current.playH = playH;
 
+    // ── Global LB çekme ───────────────────────────────────────────────────────
+
+    const fetchLeaderboard = useCallback(async () => {
+        setLbLoading(true);
+        try {
+            const res  = await fetch(`${API_BASE_URL}/api/mobile/game/scores`);
+            const data = await res.json();
+            if (data.success && Array.isArray(data.leaderboard)) {
+                setGlobalLB(data.leaderboard);
+            }
+        } catch { /* sessiz hata */ }
+        finally { setLbLoading(false); }
+    }, []);
+
+    // ── Skor gönderme ─────────────────────────────────────────────────────────
+
+    const submitScore = useCallback(async (score: number, uname: string) => {
+        if (!uname || score <= 0) return;
+        try {
+            const res  = await fetch(`${API_BASE_URL}/api/mobile/game/scores`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ username: uname, score }),
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.leaderboard)) {
+                setGlobalLB(data.leaderboard);
+            }
+        } catch { /* sessiz hata */ }
+    }, []);
+
     // ── İlk yükleme ───────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -257,13 +305,22 @@ export default function ChromaDashScreen({ navigation }: Props) {
                 if (st) setStats(JSON.parse(st) as Stats);
             } catch { /* sessiz */ }
         })();
-    }, []);
+        // Global LB'yi API'dan çek
+        fetchLeaderboard();
+    }, [fetchLeaderboard]);
 
     // ── Kullanıcı adı kaydet ──────────────────────────────────────────────────
 
     const confirmUsername = useCallback(async () => {
-        const name = usernameInput.trim().toLowerCase().replace(/\s+/g, '_');
+        const raw  = usernameInput.trim();
+        // Normalize: boşlukları alt çizgiyle değiştir, küçük harf
+        const name = raw.toLowerCase().replace(/\s+/g, '_');
         if (!name) return;
+
+        const err = validateUsername(name);
+        if (err) { setUsernameError(err); return; }
+        setUsernameError(null);
+
         setUsername(name);
         await SecureStore.setItemAsync(USERNAME_KEY, name).catch(() => {});
     }, [usernameInput]);
@@ -290,12 +347,11 @@ export default function ChromaDashScreen({ navigation }: Props) {
         scoreTimerRef.current = setInterval(() => {
             current++;
             const t     = current / steps;
-            const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out
-            const val   = Math.round(eased * target);
-            setDisplayScore(val);
+            const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+            setDisplayScore(Math.round(eased * target));
             if (current >= steps) {
                 clearInterval(scoreTimerRef.current!);
-                setDisplayScore(target); // kesin değer
+                setDisplayScore(target);
             }
         }, delay);
     }, []);
@@ -354,17 +410,26 @@ export default function ChromaDashScreen({ navigation }: Props) {
         await SecureStore.setItemAsync(LB_KEY, JSON.stringify(newLB)).catch(() => {});
         setLeaderboard(newLB);
 
-        // En yüksek geçilen rakip
-        const topBeaten = PRESET_TEAM.find(t => gs.score > t.score && t.score >= 14);
-        setBeatenRival(topBeaten ? topBeaten.name : null);
+        // Geçilen rakip: globalLB'deki en yüksek skoru geçtiğimiz kişi
+        // (sadece skor > 0 olan ve bizden farklı kullanıcılar)
+        const playerNameLower = (username ?? '').toLowerCase();
+        const beaten = [...globalLB]
+            .filter(e => e.username.toLowerCase() !== playerNameLower && gs.score > e.score)
+            .sort((a, b) => b.score - a.score)[0];
+        setBeatenRival(beaten ? beaten.username : null);
 
-        // Karışık tablodaki sıra
-        const mixed = buildMixedLB(username ?? '?', gs.score);
+        // Skor gönder (async — UI donmadan)
+        if (username && gs.score > 0) {
+            submitScore(gs.score, username);
+        }
+
+        // Karışık tablodaki sıra (mevcut globalLB üzerinden hesapla)
+        const mixed = buildMixedLB(username ?? '?', gs.score, globalLB);
         const pos   = mixed.findIndex(e => e.isPlayer) + 1;
         setLbPosition(pos);
 
         render();
-    }, [animateScore, render, username, newRecordAnim]);
+    }, [animateScore, render, username, newRecordAnim, globalLB, submitScore]);
 
     // ── Oyun döngüsü ──────────────────────────────────────────────────────────
 
@@ -496,10 +561,21 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const progress    = rankProgress(gs.score);
     const hiScore     = leaderboard[0]?.score ?? 0;
     const displayName = username ?? '?';
-    const mixedIdle   = buildMixedLB(displayName, hiScore);
-    const mixedDead   = buildMixedLB(displayName, gs.score);
 
-    const medals = ['🥇', '🥈', '🥉', '4.', '5.', '6.'];
+    // İdleRank için: globalLB + player's best
+    const mixedIdle = buildMixedLB(displayName, hiScore, globalLB);
+    // Ölüm ekranı için: globalLB + bu rundaki skor
+    const mixedDead = buildMixedLB(displayName, gs.score, globalLB);
+
+    const medals = ['🥇', '🥈', '🥉', '4.', '5.', '6.', '7.', '8.', '9.', '10.'];
+
+    // LB'yi en fazla 8 satır göster
+    const visibleIdle = mixedIdle.slice(0, 8);
+    const visibleDead = mixedDead.slice(0, 8);
+
+    // Eğer oyuncu tabloda değilse son satıra ekle (idle)
+    const playerInIdle = visibleIdle.some(e => e.isPlayer);
+    const playerInDead = visibleDead.some(e => e.isPlayer);
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -589,19 +665,22 @@ export default function ChromaDashScreen({ navigation }: Props) {
 
                                     <View style={[s.card, { borderColor: 'rgba(0,229,255,0.25)' }]}>
                                         <Text style={[s.cardLabel, { color: '#00e5ff' }]}>TAKIM YARIŞMASINA KATIL</Text>
-                                        <Text style={s.cardSub}>Skor tablonuzda görünecek kullanıcı adını gir</Text>
+                                        <Text style={s.cardSub}>Liderlik tablosunda görünecek takma adını seç</Text>
                                         <TextInput
-                                            style={s.usernameInput}
+                                            style={[s.usernameInput, usernameError ? { borderColor: '#ff2d78' } : {}]}
                                             value={usernameInput}
-                                            onChangeText={setUsernameInput}
-                                            placeholder="kullanıcı adı (max 12)"
+                                            onChangeText={t => { setUsernameInput(t); setUsernameError(null); }}
+                                            placeholder="takma ad (max 20 karakter)"
                                             placeholderTextColor="rgba(255,255,255,0.2)"
-                                            maxLength={12}
+                                            maxLength={20}
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                             returnKeyType="done"
                                             onSubmitEditing={confirmUsername}
                                         />
+                                        {usernameError && (
+                                            <Text style={s.inputError}>{usernameError}</Text>
+                                        )}
                                         <TouchableOpacity
                                             style={[s.primaryBtn, !usernameInput.trim() && s.primaryBtnDisabled]}
                                             onPress={confirmUsername}
@@ -611,17 +690,23 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* Mevcut takım önizleme */}
+                                    {/* Global LB önizleme */}
                                     <View style={s.card}>
-                                        <Text style={s.cardLabel}>MEVCUT SKOR TABLOSU</Text>
-                                        {PRESET_TEAM.map((t, i) => {
-                                            const r = getRank(t.score);
+                                        <View style={s.cardLabelRow}>
+                                            <Text style={s.cardLabel}>MEVCUT LİDERLİK TABLOSU</Text>
+                                            {lbLoading && <ActivityIndicator size="small" color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' as any }} />}
+                                        </View>
+                                        {globalLB.length === 0 && !lbLoading && (
+                                            <Text style={s.lbEmpty}>Henüz skor yok — ilk sen ol!</Text>
+                                        )}
+                                        {globalLB.slice(0, 5).map((e, i) => {
+                                            const r = getRank(e.score);
                                             return (
                                                 <View key={i} style={s.lbRow}>
                                                     <Text style={s.lbMedal}>{medals[i] ?? `${i+1}.`}</Text>
-                                                    <Text style={s.lbName}>{t.name}</Text>
-                                                    <Text style={[s.lbScore, { color: r.color }]}>{t.score}</Text>
-                                                    <Text style={s.lbRankTxt}>{r.emoji} {r.label}</Text>
+                                                    <Text style={s.lbName}>{e.username}</Text>
+                                                    <Text style={[s.lbScore, { color: r.color }]}>{e.score}</Text>
+                                                    <Text style={s.lbRankTxt}>{r.emoji}</Text>
                                                 </View>
                                             );
                                         })}
@@ -629,7 +714,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                             <Text style={s.lbMedal}>?</Text>
                                             <Text style={[s.lbName, s.lbNameSelf]}>sen  👤</Text>
                                             <Text style={[s.lbScore, { color: '#6b7280' }]}>—</Text>
-                                            <Text style={s.lbRankTxt}>henüz oynamadın</Text>
+                                            <Text style={s.lbRankTxt}>oynamadın</Text>
                                         </View>
                                     </View>
 
@@ -669,10 +754,21 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                     </View>
                                 )}
 
-                                {/* Takım skor tablosu */}
+                                {/* Global skor tablosu */}
                                 <View style={s.card}>
-                                    <Text style={s.cardLabel}>TAKIM SKOR TABLOSU</Text>
-                                    {mixedIdle.map((e, i) => {
+                                    <View style={s.cardLabelRow}>
+                                        <Text style={s.cardLabel}>LİDERLİK TABLOSU</Text>
+                                        {lbLoading
+                                            ? <ActivityIndicator size="small" color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' as any }} />
+                                            : <TouchableOpacity onPress={fetchLeaderboard} style={{ marginLeft: 'auto' as any }}>
+                                                <Text style={s.refreshTxt}>↻ yenile</Text>
+                                              </TouchableOpacity>
+                                        }
+                                    </View>
+                                    {globalLB.length === 0 && !lbLoading && (
+                                        <Text style={s.lbEmpty}>Henüz skor yok — ilk sen ol!</Text>
+                                    )}
+                                    {visibleIdle.map((e, i) => {
                                         const r = getRank(e.score);
                                         return (
                                             <View key={i} style={[s.lbRow, e.isPlayer && s.lbRowSelf]}>
@@ -687,6 +783,15 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                             </View>
                                         );
                                     })}
+                                    {/* Oyuncu tabloda görünmüyorsa hatırlat */}
+                                    {!playerInIdle && hiScore === 0 && (
+                                        <View style={[s.lbRow, s.lbRowSelf]}>
+                                            <Text style={s.lbMedal}>—</Text>
+                                            <Text style={[s.lbName, s.lbNameSelf]}>{displayName}  👤</Text>
+                                            <Text style={[s.lbScore, { color: '#6b7280' }]}>0</Text>
+                                            <Text style={s.lbRankTxt}>📋</Text>
+                                        </View>
+                                    )}
                                 </View>
 
                                 {/* Kupa rafı */}
@@ -804,12 +909,12 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                     </View>
                                 )}
 
-                                {/* Takım skor tablosu */}
+                                {/* Global liderlik tablosu */}
                                 <View style={s.card}>
                                     <Text style={s.cardLabel}>
-                                        TAKIM SKOR TABLOSU{lbPosition > 0 ? `  ·  ${lbPosition}. sıraya girdin` : ''}
+                                        LİDERLİK TABLOSU{lbPosition > 0 ? `  ·  ${lbPosition}. sıraya girdin` : ''}
                                     </Text>
-                                    {mixedDead.map((e, i) => {
+                                    {visibleDead.map((e, i) => {
                                         const r = getRank(e.score);
                                         return (
                                             <View key={i} style={[s.lbRow, e.isPlayer && s.lbRowSelf]}>
@@ -822,6 +927,14 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                             </View>
                                         );
                                     })}
+                                    {!playerInDead && (
+                                        <View style={[s.lbRow, s.lbRowSelf]}>
+                                            <Text style={s.lbMedal}>—</Text>
+                                            <Text style={[s.lbName, s.lbNameSelf]}>{displayName}  👤</Text>
+                                            <Text style={[s.lbScore, { color: curRank.color }]}>{gs.score}</Text>
+                                            <Text style={s.lbRankTxt}>{curRank.emoji}</Text>
+                                        </View>
+                                    )}
                                 </View>
 
                                 {/* Tekrar butonu */}
@@ -865,6 +978,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 onPress={() => {
                                     setUsername(null);
                                     setUsernameInput('');
+                                    setUsernameError(null);
                                     SecureStore.deleteItemAsync(USERNAME_KEY).catch(() => {});
                                 }}
                             >
@@ -973,6 +1087,8 @@ const s = StyleSheet.create({
     lbNameSelf: { color: '#00e5ff', fontWeight: '800' },
     lbScore:  { fontSize: 17, fontWeight: '900', width: 40, textAlign: 'right' },
     lbRankTxt: { fontSize: 14, width: 22, textAlign: 'center' },
+    lbEmpty:  { fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center', paddingVertical: 8 },
+    refreshTxt: { fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: '700', letterSpacing: 0.5 },
 
     // ── Kupa rafı ─────────────────────────────────────────────────────────────
     trophyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1003,7 +1119,12 @@ const s = StyleSheet.create({
         borderRadius: 10, paddingHorizontal: 14,
         color: '#fff', fontSize: 16, fontWeight: '700',
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-        marginBottom: 10, width: '100%',
+        marginBottom: 6, width: '100%',
+    },
+    inputError: {
+        fontSize: 10, color: '#ff2d78',
+        fontWeight: '700', marginBottom: 10,
+        alignSelf: 'flex-start',
     },
 
     // ── Geri sayım ────────────────────────────────────────────────────────────

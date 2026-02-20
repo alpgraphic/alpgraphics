@@ -310,6 +310,10 @@ export async function ensureIndexes(): Promise<void> {
         // Projects: id lookup
         await db.collection('projects').createIndex({ id: 1 }, { sparse: true });
 
+        // Game Scores: unique username per game, sorted leaderboard
+        await db.collection('game_scores').createIndex({ game: 1, username: 1 }, { unique: true });
+        await db.collection('game_scores').createIndex({ game: 1, score: -1 });
+
         indexesCreated = true;
     } catch (error) {
         console.error('Index creation error:', error);
@@ -336,6 +340,21 @@ export interface DbSiteSettings {
 export async function getSiteSettingsCollection(): Promise<Collection<DbSiteSettings>> {
     const db = await getDb();
     return db.collection<DbSiteSettings>('site_settings');
+}
+
+// ─── Game Scores ──────────────────────────────────────────────────────────────
+export interface DbGameScore {
+    _id?: string;
+    game:      string;   // e.g. 'chroma_dash'
+    username:  string;   // normalized lowercase, unique per game
+    score:     number;   // best score (upsert keeps max)
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export async function getGameScoresCollection(): Promise<Collection<DbGameScore>> {
+    const db = await getDb();
+    return db.collection<DbGameScore>('game_scores');
 }
 
 // Run index creation on module load (server-side only)
