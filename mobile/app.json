@@ -51,7 +51,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-game-center",
       [
         "expo-notifications",
         {

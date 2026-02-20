@@ -6,7 +6,7 @@
  * Liderlik tablosu Apple Game Center üzerinden.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -198,11 +198,37 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const playH = Math.max(200, SH - headerH - footerH);
 
     // ── Game Center ───────────────────────────────────────────────────────────
-    const gc = useGameCenter({
+    // CRITICAL: Options objesini useMemo ile sabitliyoruz.
+    // Aksi takdirde her render'da yeni obje → hook içinde getService
+    // her render'da değişir → useEffect sürekli çalışır → sonsuz döngü.
+    const gcOptions = useMemo(() => ({
         leaderboards: { highscore: GC_LEADERBOARD_ID },
         autoInitialize: true,
-        autoAuthenticate: true,
-    });
+        autoAuthenticate: false, // Manuel yönetiyoruz (library'nin koşulu güvenilmez)
+    }), []); // boş deps: bir kez oluştur, asla değişme
+
+    const gc = useGameCenter(gcOptions);
+
+    // gc'yi bir ref'e sakla: die/submitScoreToBackend gc'ye doğrudan
+    // bağımlı olmasın, yoksa gameLoop her GC state değişiminde yeniden
+    // oluşur ve RAF kaybolur.
+    const gcRef = useRef(gc);
+    gcRef.current = gc;
+
+    // ── GC Authentication: init bittikten sonra manuel tetikle ───────────────
+    useEffect(() => {
+        // 'not_authenticated' veya 'initialized' durumuna geçince authenticate et
+        if (
+            gc.isPlatformSupported &&
+            !gc.isLoading &&
+            !gc.isReady &&
+            gc.status.state !== 'authenticating' &&
+            gc.status.state !== 'uninitialized'
+        ) {
+            gc.authenticate().catch(() => { /* sessiz */ });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gc.status.state, gc.isLoading]); // gc.authenticate sabit (useMemo koruyor)
 
     // Temel UI state
     const [, setTick] = useState(0);
@@ -243,14 +269,16 @@ export default function ChromaDashScreen({ navigation }: Props) {
     }, []);
 
     // ── Skor gönderme (Game Center + Backend bildirim amaçlı) ─────────────────
+    // gcRef.current kullanıyoruz → gc.player'a bağımlı değil → gameLoop stabil
 
     const submitScoreToBackend = useCallback(async (score: number) => {
         if (score <= 0) return;
         try {
             const pushToken = await getPushToken();
+            const currentGC = gcRef.current;
             const body: Record<string, unknown> = {
-                gcPlayerId: gc.player?.playerID ?? 'unknown',
-                displayName: gc.player?.displayName ?? gc.player?.alias ?? 'Anonim',
+                gcPlayerId: currentGC.player?.playerID ?? 'unknown',
+                displayName: currentGC.player?.displayName ?? currentGC.player?.alias ?? 'Anonim',
                 score,
             };
             if (pushToken) body.pushToken = pushToken;
@@ -261,7 +289,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                 body: JSON.stringify(body),
             });
         } catch { /* sessiz — bildirim göndermek kritik değil */ }
-    }, [gc.player, getPushToken]);
+    }, [getPushToken]); // gcRef.current → bağımlılığa gerek yok
 
     // ── İlk yükleme ───────────────────────────────────────────────────────────
 
@@ -363,9 +391,9 @@ export default function ChromaDashScreen({ navigation }: Props) {
         await SecureStore.setItemAsync(LB_KEY, JSON.stringify(newLB)).catch(() => { });
         setLeaderboard(newLB);
 
-        // Game Center'a skor gönder
-        if (gs.score > 0 && gc.isReady) {
-            gc.submitScore(gs.score, 'highscore').catch(() => { });
+        // Game Center'a skor gönder (gcRef.current → gc'ye bağımlı değil)
+        if (gs.score > 0 && gcRef.current.isReady) {
+            gcRef.current.submitScore(gs.score, 'highscore').catch(() => { });
         }
 
         // Backend'e bildirim amaçlı skor gönder
@@ -374,7 +402,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
         }
 
         render();
-    }, [animateScore, render, newRecordAnim, gc, submitScoreToBackend]);
+    }, [animateScore, render, newRecordAnim, submitScoreToBackend]);
 
     // ── Oyun döngüsü ──────────────────────────────────────────────────────────
 
