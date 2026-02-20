@@ -265,6 +265,23 @@ export default function DashboardScreen({ navigation }: Props) {
                     <Text style={styles.actionArrow}>→</Text>
                 </TouchableOpacity>
 
+                {/* Gizli Oyun Kartı 🎨 */}
+                <TouchableOpacity
+                    style={styles.gameCard}
+                    onPress={() => navigation.navigate('Game')}
+                    activeOpacity={0.8}
+                >
+                    <View style={styles.gameDotsRow}>
+                        {[0, 51, 103, 154, 205, 257, 308].map((h, i) => (
+                            <View key={i} style={[styles.gameDot, { backgroundColor: `hsl(${h}, 70%, 55%)` }]} />
+                        ))}
+                    </View>
+                    <View style={styles.gameCardInfo}>
+                        <Text style={styles.gameCardTitle}>Renk Ustası</Text>
+                        <Text style={styles.gameCardDesc}>Renk algını test et →</Text>
+                    </View>
+                </TouchableOpacity>
+
                 {/* Info Cards */}
                 <View style={styles.infoGrid}>
                     <View style={styles.infoCard}>
@@ -507,6 +524,40 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: COLORS.text,
+    },
+    // Game card
+    gameCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: SPACING.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    gameDotsRow: {
+        flexDirection: 'row',
+        gap: 4,
+        marginRight: SPACING.md,
+    },
+    gameDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    gameCardInfo: {
+        flex: 1,
+    },
+    gameCardTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    gameCardDesc: {
+        fontSize: 12,
+        color: COLORS.textLight,
+        marginTop: 2,
     },
     // Balance card
     balanceCard: {
