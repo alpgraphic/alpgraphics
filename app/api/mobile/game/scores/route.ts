@@ -1,56 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameScoresCollection } from '@/lib/mongodb';
 import { rateLimitMiddleware, checkRateLimit, getClientIP } from '@/lib/security/rateLimit';
-import { validateUsername } from '@/lib/profanity';
+import { sendPushNotification } from '@/lib/pushNotifications';
 
 const GAME_ID = 'chroma_dash';
-const LEADERBOARD_LIMIT = 20;
 
 // ─── CORS helper ──────────────────────────────────────────────────────────────
 function corsHeaders() {
     return {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
     };
 }
 
-// ─── GET /api/mobile/game/scores?game=chroma_dash ─────────────────────────────
-// Public — no auth required
-export async function GET(request: NextRequest) {
-    try {
-        const rateLimited = await rateLimitMiddleware(request, 'public');
-        if (rateLimited) return rateLimited;
-
-        const col = await getGameScoresCollection();
-        const entries = await col
-            .find({ game: GAME_ID })
-            .sort({ score: -1 })
-            .limit(LEADERBOARD_LIMIT)
-            .toArray();
-
-        const leaderboard = entries.map((e, i) => ({
-            rank:     i + 1,
-            username: e.username,
-            score:    e.score,
-        }));
-
-        return NextResponse.json(
-            { success: true, leaderboard },
-            { headers: corsHeaders() }
-        );
-    } catch (error) {
-        console.error('Game scores GET error:', error);
-        return NextResponse.json(
-            { success: false, error: 'Liderlik tablosu alınamadı' },
-            { status: 500, headers: corsHeaders() }
-        );
-    }
-}
-
 // ─── POST /api/mobile/game/scores ─────────────────────────────────────────────
-// Body: { username: string, score: number }
-// No auth — but rate-limited (auth tier = 10 req / 15 min per IP)
+// Body: { gcPlayerId: string, displayName: string, score: number, pushToken?: string }
+// Public — no auth, rate-limited. Used for "X beat you" push notifications.
 export async function POST(request: NextRequest) {
     try {
         // Strict rate limit for score submissions
@@ -71,25 +37,20 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { username, score } = body as { username?: unknown; score?: unknown };
+        const { gcPlayerId, displayName, score, pushToken } = body as {
+            gcPlayerId?: unknown;
+            displayName?: unknown;
+            score?: unknown;
+            pushToken?: unknown;
+        };
 
-        // Validate username
-        if (typeof username !== 'string') {
+        // Validate
+        if (typeof gcPlayerId !== 'string' || !gcPlayerId.trim()) {
             return NextResponse.json(
-                { success: false, error: 'Kullanıcı adı gerekli' },
+                { success: false, error: 'gcPlayerId gerekli' },
                 { status: 400, headers: corsHeaders() }
             );
         }
-
-        const usernameError = validateUsername(username);
-        if (usernameError) {
-            return NextResponse.json(
-                { success: false, error: usernameError },
-                { status: 400, headers: corsHeaders() }
-            );
-        }
-
-        // Validate score
         if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 9999) {
             return NextResponse.json(
                 { success: false, error: 'Geçersiz skor' },
@@ -97,46 +58,76 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const normalizedUsername = username.trim().toLowerCase();
+        const playerName = typeof displayName === 'string' ? displayName.trim().slice(0, 30) : 'Anonim';
+        const normalizedId = gcPlayerId.trim();
         const now = new Date();
         const col = await getGameScoresCollection();
 
-        // Upsert: only update score if new score is strictly higher
-        const existing = await col.findOne({ game: GAME_ID, username: normalizedUsername });
+        // Get current record for this player
+        const existing = await col.findOne({ game: GAME_ID, gcPlayerId: normalizedId });
+        const oldScore = existing?.score ?? 0;
 
-        if (!existing) {
-            // New player — insert
-            await col.insertOne({
-                game:      GAME_ID,
-                username:  normalizedUsername,
-                score,
-                createdAt: now,
-                updatedAt: now,
-            });
-        } else if (score > existing.score) {
-            // Beat their own best — update
-            await col.updateOne(
-                { game: GAME_ID, username: normalizedUsername },
-                { $set: { score, updatedAt: now } }
+        if (score <= oldScore) {
+            // Score didn't improve — no notifications needed
+            return NextResponse.json(
+                { success: true, improved: false },
+                { headers: corsHeaders() }
             );
         }
-        // If score <= existing.score, do nothing — leaderboard unchanged
 
-        // Return updated top-20 so the client can refresh in one round-trip
-        const entries = await col
-            .find({ game: GAME_ID })
-            .sort({ score: -1 })
-            .limit(LEADERBOARD_LIMIT)
-            .toArray();
+        // Upsert player's best score
+        const updateData: Record<string, unknown> = {
+            game: GAME_ID,
+            gcPlayerId: normalizedId,
+            displayName: playerName,
+            score,
+            updatedAt: now,
+        };
+        if (typeof pushToken === 'string' && pushToken.trim()) {
+            updateData.pushToken = pushToken.trim();
+        }
 
-        const leaderboard = entries.map((e, i) => ({
-            rank:     i + 1,
-            username: e.username,
-            score:    e.score,
-        }));
+        if (!existing) {
+            await col.insertOne({ ...updateData, createdAt: now } as any);
+        } else {
+            await col.updateOne(
+                { game: GAME_ID, gcPlayerId: normalizedId },
+                { $set: updateData }
+            );
+        }
+
+        // ── "X seni geçti!" bildirimi ─────────────────────────────────────────
+        // Find players whose score is between the player's old and new scores
+        // These players were just beaten by this player
+        try {
+            const beatenPlayers = await col.find({
+                game: GAME_ID,
+                gcPlayerId: { $ne: normalizedId },
+                score: { $gte: oldScore, $lt: score },
+                pushToken: { $exists: true, $ne: '' },
+            }).toArray();
+
+            if (beatenPlayers.length > 0) {
+                const tokens = beatenPlayers
+                    .map(p => p.pushToken)
+                    .filter((t): t is string => !!t);
+
+                if (tokens.length > 0) {
+                    await sendPushNotification(tokens, {
+                        title: '🎮 Chroma Dash',
+                        body: `${playerName} seni geçti! Yeni skor: ${score}`,
+                        data: { type: 'game_beaten', game: GAME_ID },
+                        sound: 'default',
+                    });
+                }
+            }
+        } catch (notifError) {
+            // Non-critical — don't fail the request
+            console.error('Beat notification error:', notifError);
+        }
 
         return NextResponse.json(
-            { success: true, leaderboard },
+            { success: true, improved: true },
             { headers: corsHeaders() }
         );
     } catch (error) {

@@ -310,8 +310,8 @@ export async function ensureIndexes(): Promise<void> {
         // Projects: id lookup
         await db.collection('projects').createIndex({ id: 1 }, { sparse: true });
 
-        // Game Scores: unique username per game, sorted leaderboard
-        await db.collection('game_scores').createIndex({ game: 1, username: 1 }, { unique: true });
+        // Game Scores: unique GC player per game, sorted leaderboard
+        await db.collection('game_scores').createIndex({ game: 1, gcPlayerId: 1 }, { unique: true });
         await db.collection('game_scores').createIndex({ game: 1, score: -1 });
 
         indexesCreated = true;
@@ -345,9 +345,11 @@ export async function getSiteSettingsCollection(): Promise<Collection<DbSiteSett
 // ─── Game Scores ──────────────────────────────────────────────────────────────
 export interface DbGameScore {
     _id?: string;
-    game:      string;   // e.g. 'chroma_dash'
-    username:  string;   // normalized lowercase, unique per game
-    score:     number;   // best score (upsert keeps max)
+    game: string;   // e.g. 'chroma_dash'
+    gcPlayerId: string;   // Game Center player ID, unique per game
+    displayName: string;   // Game Center display name
+    score: number;   // best score (upsert keeps max)
+    pushToken?: string;   // Expo push token for notifications
     createdAt: Date;
     updatedAt: Date;
 }
