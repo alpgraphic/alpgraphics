@@ -93,12 +93,13 @@ export default function ClientDashboard() {
 
     const handleSubmitBrief = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!account || !account.briefToken) return;
+        if (!account) return;
 
         setIsSubmitting(true);
 
         try {
-            const response = await fetch(`/api/brief/${account.briefToken}`, {
+            // Müşteri oturumuna (session) dayalı yeni güvenli endpoint
+            const response = await fetch(`/api/client/brief`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ responses })

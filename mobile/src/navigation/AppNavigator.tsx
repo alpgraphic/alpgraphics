@@ -16,6 +16,7 @@ import AdminProjectsScreen from '../screens/AdminProjectsScreen';
 import AdminMessagesScreen from '../screens/AdminMessagesScreen';
 import ChatScreen from '../screens/ChatScreen';
 import PlannerScreen from '../screens/PlannerScreen';
+import BriefFormScreen from '../screens/BriefFormScreen';
 
 import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
@@ -34,7 +35,7 @@ export type RootStackParamList = {
     AdminMessages: undefined;
     Chat: { accountId: string; companyName?: string; accountName?: string };
     Planner: undefined;
-    BriefForm: undefined;
+    BriefForm: { briefId?: string; isReadOnly?: boolean } | undefined;
 };
 
 type Props = {
@@ -61,17 +62,32 @@ export default function AppNavigator({ onAuthenticated }: Props) {
             try {
                 const authenticated = await isAuthenticated();
                 if (authenticated) {
-                    const userData = await getUserData();
-                    if (userData?.role === 'admin') {
-                        setInitialRoute('AdminDashboard');
-                    } else if (userData?.role) {
-                        setInitialRoute('Dashboard');
+                    // Start Biometric Authentication
+                    const { isBiometricAvailable, authenticateWithBiometric } = await import('../lib/auth');
+                    const hasBiometric = await isBiometricAvailable();
+
+                    let biometricSuccess = true;
+                    if (hasBiometric) {
+                        biometricSuccess = await authenticateWithBiometric('Uygulamaya giriş için kimliğinizi doğrulayın');
                     }
-                    // Trigger push notification registration
-                    onAuthenticated?.();
+
+                    if (biometricSuccess) {
+                        const userData = await getUserData();
+                        if (userData?.role === 'admin') {
+                            setInitialRoute('AdminDashboard');
+                        } else if (userData?.role) {
+                            setInitialRoute('Dashboard');
+                        }
+                        // Trigger push notification registration
+                        onAuthenticated?.();
+                    } else {
+                        // User cancelled or biometric failed -> Revert to Login Screen
+                        setInitialRoute('Login');
+                    }
                 }
             } catch {
                 // Default to Welcome on any error
+                setInitialRoute('Welcome');
             }
             setIsReady(true);
         };
@@ -99,7 +115,7 @@ export default function AppNavigator({ onAuthenticated }: Props) {
             );
         });
 
-        return () => setSessionExpiredHandler(() => {});
+        return () => setSessionExpiredHandler(() => { });
     }, []);
 
     if (!isReady) return <LoadingScreen />;
@@ -142,6 +158,11 @@ export default function AppNavigator({ onAuthenticated }: Props) {
                 <Stack.Screen name="Planner" component={PlannerScreen} />
 
                 {/* Shared Screens */}
+                <Stack.Screen
+                    name="BriefForm"
+                    component={BriefFormScreen}
+                    options={{ animation: 'slide_from_right' }}
+                />
                 <Stack.Screen
                     name="Chat"
                     component={ChatScreen}
