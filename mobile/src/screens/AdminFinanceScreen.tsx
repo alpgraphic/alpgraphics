@@ -10,6 +10,10 @@ import {
     ActivityIndicator,
     Modal,
     TextInput,
+    Keyboard,
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -224,83 +228,83 @@ export default function AdminFinanceScreen({ navigation }: Props) {
                         <ActivityIndicator color={COLORS.primary} size="large" />
                     </View>
                 ) : (
-                <>
-                {activeTab === 'overview' && (
                     <>
-                        <View style={styles.statRow}>
-                            <View style={styles.statCard}>
-                                <Text style={styles.statLabel}>Gelir</Text>
-                                <Text style={[styles.statValue, { color: COLORS.success }]}>
-                                    ₺{stats.revenue >= 1000 ? `${(stats.revenue / 1000).toFixed(0)}K` : stats.revenue.toFixed(0)}
-                                </Text>
-                            </View>
-                            <View style={styles.statCard}>
-                                <Text style={styles.statLabel}>Gider</Text>
-                                <Text style={[styles.statValue, { color: COLORS.error }]}>
-                                    ₺{stats.expenses >= 1000 ? `${(stats.expenses / 1000).toFixed(0)}K` : stats.expenses.toFixed(0)}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.profitCard}>
-                            <Text style={styles.profitLabel}>Net Kar</Text>
-                            <Text style={styles.profitValue}>₺{stats.profit.toLocaleString()}</Text>
-                        </View>
-                        <View style={styles.pendingCard}>
-                            <Text style={styles.pendingLabel}>Bekleyen Ödemeler</Text>
-                            <Text style={styles.pendingValue}>₺{stats.pending.toLocaleString()}</Text>
-                        </View>
-                    </>
-                )}
-
-                {activeTab === 'invoices' && (
-                    <>
-                        {payments.length === 0 ? (
-                            <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
-                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz ödeme yok</Text>
-                            </View>
-                        ) : (
-                            payments.map(tx => (
-                                <View key={tx.id} style={styles.invoiceCard}>
-                                    <View style={styles.invoiceLeft}>
-                                        <Text style={styles.invoiceClient}>{tx.description || 'Ödeme'}</Text>
-                                        <Text style={styles.invoiceDate}>
-                                            {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                        {activeTab === 'overview' && (
+                            <>
+                                <View style={styles.statRow}>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statLabel}>Gelir</Text>
+                                        <Text style={[styles.statValue, { color: COLORS.success }]}>
+                                            ₺{stats.revenue >= 1000 ? `${(stats.revenue / 1000).toFixed(0)}K` : stats.revenue.toFixed(0)}
                                         </Text>
                                     </View>
-                                    <View style={styles.invoiceRight}>
-                                        <Text style={styles.invoiceAmount}>₺{tx.amount.toLocaleString()}</Text>
-                                        <View style={[styles.invoiceStatus, { backgroundColor: COLORS.successLight }]}>
-                                            <Text style={[styles.invoiceStatusText, { color: COLORS.success }]}>Ödendi</Text>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statLabel}>Gider</Text>
+                                        <Text style={[styles.statValue, { color: COLORS.error }]}>
+                                            ₺{stats.expenses >= 1000 ? `${(stats.expenses / 1000).toFixed(0)}K` : stats.expenses.toFixed(0)}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.profitCard}>
+                                    <Text style={styles.profitLabel}>Net Kar</Text>
+                                    <Text style={styles.profitValue}>₺{stats.profit.toLocaleString()}</Text>
+                                </View>
+                                <View style={styles.pendingCard}>
+                                    <Text style={styles.pendingLabel}>Bekleyen Ödemeler</Text>
+                                    <Text style={styles.pendingValue}>₺{stats.pending.toLocaleString()}</Text>
+                                </View>
+                            </>
+                        )}
+
+                        {activeTab === 'invoices' && (
+                            <>
+                                {payments.length === 0 ? (
+                                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz ödeme yok</Text>
+                                    </View>
+                                ) : (
+                                    payments.map(tx => (
+                                        <View key={tx.id} style={styles.invoiceCard}>
+                                            <View style={styles.invoiceLeft}>
+                                                <Text style={styles.invoiceClient}>{tx.description || 'Ödeme'}</Text>
+                                                <Text style={styles.invoiceDate}>
+                                                    {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.invoiceRight}>
+                                                <Text style={styles.invoiceAmount}>₺{tx.amount.toLocaleString()}</Text>
+                                                <View style={[styles.invoiceStatus, { backgroundColor: COLORS.successLight }]}>
+                                                    <Text style={[styles.invoiceStatusText, { color: COLORS.success }]}>Ödendi</Text>
+                                                </View>
+                                            </View>
                                         </View>
-                                    </View>
-                                </View>
-                            ))
+                                    ))
+                                )}
+                            </>
                         )}
-                    </>
-                )}
 
-                {activeTab === 'expenses' && (
-                    <>
-                        {debts.length === 0 ? (
-                            <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
-                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz gider yok</Text>
-                            </View>
-                        ) : (
-                            debts.map(tx => (
-                                <View key={tx.id} style={styles.expenseCard}>
-                                    <View>
-                                        <Text style={styles.expenseTitle}>{tx.description || 'Borç'}</Text>
-                                        <Text style={styles.expenseCategory}>
-                                            {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                                        </Text>
+                        {activeTab === 'expenses' && (
+                            <>
+                                {debts.length === 0 ? (
+                                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted }}>Henüz gider yok</Text>
                                     </View>
-                                    <Text style={styles.expenseAmount}>-₺{tx.amount.toLocaleString()}</Text>
-                                </View>
-                            ))
+                                ) : (
+                                    debts.map(tx => (
+                                        <View key={tx.id} style={styles.expenseCard}>
+                                            <View>
+                                                <Text style={styles.expenseTitle}>{tx.description || 'Borç'}</Text>
+                                                <Text style={styles.expenseCategory}>
+                                                    {new Date(tx.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.expenseAmount}>-₺{tx.amount.toLocaleString()}</Text>
+                                        </View>
+                                    ))
+                                )}
+                            </>
                         )}
                     </>
-                )}
-                </>
                 )}
 
                 <View style={{ height: 40 }} />
@@ -308,133 +312,137 @@ export default function AdminFinanceScreen({ navigation }: Props) {
 
             {/* Add Transaction Modal */}
             <Modal visible={showAddTransactionModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHandle} />
-                        <Text style={styles.modalTitle}>Yeni İşlem</Text>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback accessible={false}>
+                            <View style={styles.modalContent}>
+                                <View style={styles.modalHandle} />
+                                <Text style={styles.modalTitle}>Yeni İşlem</Text>
 
-                        {/* Transaction Type Selector */}
-                        <Text style={styles.inputLabel}>İŞLEM TİPİ</Text>
-                        <View style={styles.typeSelector}>
-                            {(['Payment', 'Debt'] as const).map(type => (
-                                <TouchableOpacity
-                                    key={type}
-                                    style={[
-                                        styles.typeOption,
-                                        newTransactionType === type && styles.typeOptionActive,
-                                    ]}
-                                    onPress={() => setNewTransactionType(type)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.typeOptionText,
-                                            newTransactionType === type && styles.typeOptionTextActive,
-                                        ]}
-                                    >
-                                        {type === 'Payment' ? 'Ödeme' : 'Borç'}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                                {/* Transaction Type Selector */}
+                                <Text style={styles.inputLabel}>İŞLEM TİPİ</Text>
+                                <View style={styles.typeSelector}>
+                                    {(['Payment', 'Debt'] as const).map(type => (
+                                        <TouchableOpacity
+                                            key={type}
+                                            style={[
+                                                styles.typeOption,
+                                                newTransactionType === type && styles.typeOptionActive,
+                                            ]}
+                                            onPress={() => setNewTransactionType(type)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.typeOptionText,
+                                                    newTransactionType === type && styles.typeOptionTextActive,
+                                                ]}
+                                            >
+                                                {type === 'Payment' ? 'Ödeme' : 'Borç'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
 
-                        {/* Account Selector */}
-                        <Text style={styles.inputLabel}>HESAP</Text>
-                        <ScrollView style={styles.accountList} nestedScrollEnabled>
-                            {accounts.length === 0 ? (
-                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, padding: SPACING.md }}>
-                                    Hesap yok
-                                </Text>
-                            ) : (
-                                accounts.map(account => (
+                                {/* Account Selector */}
+                                <Text style={styles.inputLabel}>HESAP</Text>
+                                <ScrollView style={styles.accountList} nestedScrollEnabled>
+                                    {accounts.length === 0 ? (
+                                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, padding: SPACING.md }}>
+                                            Hesap yok
+                                        </Text>
+                                    ) : (
+                                        accounts.map(account => (
+                                            <TouchableOpacity
+                                                key={account.id}
+                                                style={[
+                                                    styles.accountOption,
+                                                    newTransactionAccountId === account.id && styles.accountOptionActive,
+                                                ]}
+                                                onPress={() => setNewTransactionAccountId(account.id)}
+                                            >
+                                                <View style={styles.accountOptionContent}>
+                                                    <Text
+                                                        style={[
+                                                            styles.accountOptionName,
+                                                            newTransactionAccountId === account.id && styles.accountOptionNameActive,
+                                                        ]}
+                                                    >
+                                                        {account.company}
+                                                    </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.accountOptionPerson,
+                                                            newTransactionAccountId === account.id && styles.accountOptionPersonActive,
+                                                        ]}
+                                                    >
+                                                        {account.name}
+                                                    </Text>
+                                                </View>
+                                                {newTransactionAccountId === account.id && (
+                                                    <Text style={{ fontSize: FONTS.md, color: COLORS.primary }}>✓</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        ))
+                                    )}
+                                </ScrollView>
+
+                                {/* Amount Input */}
+                                <Text style={styles.inputLabel}>TUTAR (₺)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="1000"
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={newTransactionAmount}
+                                    onChangeText={setNewTransactionAmount}
+                                    keyboardType="decimal-pad"
+                                />
+
+                                {/* Description Input */}
+                                <Text style={styles.inputLabel}>AÇIKLAMA</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Proje bedeli, ödeme vb."
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={newTransactionDescription}
+                                    onChangeText={setNewTransactionDescription}
+                                    multiline
+                                    numberOfLines={3}
+                                />
+
+                                {/* Date Input */}
+                                <Text style={styles.inputLabel}>TARİH</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="YYYY-MM-DD"
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={newTransactionDate}
+                                    onChangeText={setNewTransactionDate}
+                                />
+
+                                <View style={styles.modalButtons}>
                                     <TouchableOpacity
-                                        key={account.id}
-                                        style={[
-                                            styles.accountOption,
-                                            newTransactionAccountId === account.id && styles.accountOptionActive,
-                                        ]}
-                                        onPress={() => setNewTransactionAccountId(account.id)}
+                                        style={styles.cancelBtn}
+                                        onPress={() => setShowAddTransactionModal(false)}
+                                        disabled={submittingTransaction}
                                     >
-                                        <View style={styles.accountOptionContent}>
-                                            <Text
-                                                style={[
-                                                    styles.accountOptionName,
-                                                    newTransactionAccountId === account.id && styles.accountOptionNameActive,
-                                                ]}
-                                            >
-                                                {account.company}
-                                            </Text>
-                                            <Text
-                                                style={[
-                                                    styles.accountOptionPerson,
-                                                    newTransactionAccountId === account.id && styles.accountOptionPersonActive,
-                                                ]}
-                                            >
-                                                {account.name}
-                                            </Text>
-                                        </View>
-                                        {newTransactionAccountId === account.id && (
-                                            <Text style={{ fontSize: FONTS.md, color: COLORS.primary }}>✓</Text>
+                                        <Text style={styles.cancelBtnText}>İptal</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.submitBtn}
+                                        onPress={handleSubmitTransaction}
+                                        disabled={submittingTransaction}
+                                    >
+                                        {submittingTransaction ? (
+                                            <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                        ) : (
+                                            <Text style={styles.submitBtnText}>Kaydet</Text>
                                         )}
                                     </TouchableOpacity>
-                                ))
-                            )}
-                        </ScrollView>
-
-                        {/* Amount Input */}
-                        <Text style={styles.inputLabel}>TUTAR (₺)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="1000"
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newTransactionAmount}
-                            onChangeText={setNewTransactionAmount}
-                            keyboardType="decimal-pad"
-                        />
-
-                        {/* Description Input */}
-                        <Text style={styles.inputLabel}>AÇIKLAMA</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Proje bedeli, ödeme vb."
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newTransactionDescription}
-                            onChangeText={setNewTransactionDescription}
-                            multiline
-                            numberOfLines={3}
-                        />
-
-                        {/* Date Input */}
-                        <Text style={styles.inputLabel}>TARİH</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newTransactionDate}
-                            onChangeText={setNewTransactionDate}
-                        />
-
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setShowAddTransactionModal(false)}
-                                disabled={submittingTransaction}
-                            >
-                                <Text style={styles.cancelBtnText}>İptal</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.submitBtn}
-                                onPress={handleSubmitTransaction}
-                                disabled={submittingTransaction}
-                            >
-                                {submittingTransaction ? (
-                                    <ActivityIndicator color={COLORS.textInverse} size="small" />
-                                ) : (
-                                    <Text style={styles.submitBtnText}>Kaydet</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );

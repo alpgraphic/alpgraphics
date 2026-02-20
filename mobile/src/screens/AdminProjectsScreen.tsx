@@ -10,6 +10,10 @@ import {
     Modal,
     TextInput,
     ActivityIndicator,
+    Keyboard,
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -225,86 +229,90 @@ export default function AdminProjectsScreen({ navigation }: Props) {
 
             {/* Edit Project Modal */}
             <Modal visible={showEditModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHandle} />
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback accessible={false}>
+                            <View style={styles.modalContent}>
+                                <View style={styles.modalHandle} />
 
-                        {selectedProject && (
-                            <>
-                                <Text style={styles.modalTitle}>{selectedProject.title}</Text>
+                                {selectedProject && (
+                                    <>
+                                        <Text style={styles.modalTitle}>{selectedProject.title}</Text>
 
-                                {/* Project Info - Read Only */}
-                                <View style={styles.detailSection}>
-                                    <Text style={styles.detailLabel}>MÜŞTERİ</Text>
-                                    <Text style={styles.detailValue}>{selectedProject.client}</Text>
-                                </View>
+                                        {/* Project Info - Read Only */}
+                                        <View style={styles.detailSection}>
+                                            <Text style={styles.detailLabel}>MÜŞTERİ</Text>
+                                            <Text style={styles.detailValue}>{selectedProject.client}</Text>
+                                        </View>
 
-                                <View style={styles.detailSection}>
-                                    <Text style={styles.detailLabel}>KATEGORİ</Text>
-                                    <Text style={styles.detailValue}>{selectedProject.category}</Text>
-                                </View>
+                                        <View style={styles.detailSection}>
+                                            <Text style={styles.detailLabel}>KATEGORİ</Text>
+                                            <Text style={styles.detailValue}>{selectedProject.category}</Text>
+                                        </View>
 
-                                {/* Status Selector */}
-                                <Text style={styles.inputLabel}>DURUM</Text>
-                                <View style={styles.statusSelector}>
-                                    {(['active', 'completed', 'paused', 'cancelled'] as const).map(status => (
-                                        <TouchableOpacity
-                                            key={status}
-                                            style={[
-                                                styles.statusOption,
-                                                editStatus === status && styles.statusOptionActive,
-                                                { borderColor: getStatusColor(status) },
-                                            ]}
-                                            onPress={() => setEditStatus(status)}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.statusOptionText,
-                                                    editStatus === status && styles.statusOptionTextActive,
-                                                    { color: getStatusColor(status) },
-                                                ]}
+                                        {/* Status Selector */}
+                                        <Text style={styles.inputLabel}>DURUM</Text>
+                                        <View style={styles.statusSelector}>
+                                            {(['active', 'completed', 'paused', 'cancelled'] as const).map(status => (
+                                                <TouchableOpacity
+                                                    key={status}
+                                                    style={[
+                                                        styles.statusOption,
+                                                        editStatus === status && styles.statusOptionActive,
+                                                        { borderColor: getStatusColor(status) },
+                                                    ]}
+                                                    onPress={() => setEditStatus(status)}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.statusOptionText,
+                                                            editStatus === status && styles.statusOptionTextActive,
+                                                            { color: getStatusColor(status) },
+                                                        ]}
+                                                    >
+                                                        {getStatusLabel(status)}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+
+                                        {/* Progress Input */}
+                                        <Text style={styles.inputLabel}>İLERLEME (%)</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="0-100"
+                                            placeholderTextColor={COLORS.textMuted}
+                                            value={editProgress}
+                                            onChangeText={setEditProgress}
+                                            keyboardType="decimal-pad"
+                                        />
+
+                                        <View style={styles.modalButtons}>
+                                            <TouchableOpacity
+                                                style={styles.cancelBtn}
+                                                onPress={() => setShowEditModal(false)}
+                                                disabled={submitting}
                                             >
-                                                {getStatusLabel(status)}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-
-                                {/* Progress Input */}
-                                <Text style={styles.inputLabel}>İLERLEME (%)</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="0-100"
-                                    placeholderTextColor={COLORS.textMuted}
-                                    value={editProgress}
-                                    onChangeText={setEditProgress}
-                                    keyboardType="decimal-pad"
-                                />
-
-                                <View style={styles.modalButtons}>
-                                    <TouchableOpacity
-                                        style={styles.cancelBtn}
-                                        onPress={() => setShowEditModal(false)}
-                                        disabled={submitting}
-                                    >
-                                        <Text style={styles.cancelBtnText}>Kapat</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.submitBtn}
-                                        onPress={handleSaveProject}
-                                        disabled={submitting}
-                                    >
-                                        {submitting ? (
-                                            <ActivityIndicator color={COLORS.textInverse} size="small" />
-                                        ) : (
-                                            <Text style={styles.submitBtnText}>Kaydet</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            </>
-                        )}
-                    </View>
-                </View>
+                                                <Text style={styles.cancelBtnText}>Kapat</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={styles.submitBtn}
+                                                onPress={handleSaveProject}
+                                                disabled={submitting}
+                                            >
+                                                {submitting ? (
+                                                    <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                                ) : (
+                                                    <Text style={styles.submitBtnText}>Kaydet</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );

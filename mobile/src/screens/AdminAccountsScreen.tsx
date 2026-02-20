@@ -10,6 +10,10 @@ import {
     Modal,
     ActivityIndicator,
     RefreshControl,
+    Keyboard,
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -257,197 +261,205 @@ export default function AdminAccountsScreen({ navigation }: Props) {
 
             {/* Create Account Modal */}
             <Modal visible={showModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHandle} />
-                        <Text style={styles.modalTitle}>Yeni Hesap</Text>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback accessible={false}>
+                            <View style={styles.modalContent}>
+                                <View style={styles.modalHandle} />
+                                <Text style={styles.modalTitle}>Yeni Hesap</Text>
 
-                        <Text style={styles.inputLabel}>YETKİLİ ADI</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Ahmet Yılmaz"
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newName}
-                            onChangeText={setNewName}
-                        />
-
-                        <Text style={styles.inputLabel}>ŞİRKET</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Tech Start A.Ş."
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newCompany}
-                            onChangeText={setNewCompany}
-                        />
-
-                        <Text style={styles.inputLabel}>E-POSTA</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="info@firma.com"
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newEmail}
-                            onChangeText={setNewEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-
-                        <Text style={styles.inputLabel}>ŞİFRE</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="••••••••"
-                            placeholderTextColor={COLORS.textMuted}
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                            secureTextEntry
-                        />
-
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setShowModal(false)}
-                            >
-                                <Text style={styles.cancelBtnText}>İptal</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.submitBtn} onPress={handleCreate}>
-                                <Text style={styles.submitBtnText}>Oluştur</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* Account Detail & Transaction Modal */}
-            <Modal visible={showDetailModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHandle} />
-
-                        {selectedAccount && !transactionMode && (
-                            <>
-                                <Text style={styles.modalTitle}>{selectedAccount.company}</Text>
-
-                                <View style={styles.detailSection}>
-                                    <Text style={styles.detailLabel}>YETKİLİ</Text>
-                                    <Text style={styles.detailValue}>{selectedAccount.name}</Text>
-                                </View>
-
-                                <View style={styles.detailSection}>
-                                    <Text style={styles.detailLabel}>E-POSTA</Text>
-                                    <Text style={styles.detailValue}>{selectedAccount.email}</Text>
-                                </View>
-
-                                <View style={styles.detailSection}>
-                                    <Text style={styles.detailLabel}>BAKİYE</Text>
-                                    <Text style={[
-                                        styles.detailValue,
-                                        { color: calculateBalance(selectedAccount) < 0 ? COLORS.error : COLORS.success }
-                                    ]}>
-                                        ₺{Math.abs(calculateBalance(selectedAccount)).toLocaleString('tr-TR')}
-                                    </Text>
-                                </View>
-
-                                {selectedAccount.briefStatus && selectedAccount.briefStatus !== 'none' && (
-                                    <View style={styles.detailSection}>
-                                        <Text style={styles.detailLabel}>DURUM</Text>
-                                        <View style={[
-                                            styles.statusBadge,
-                                            { backgroundColor: getStatusStyle(selectedAccount.briefStatus).bg }
-                                        ]}>
-                                            <Text style={[
-                                                styles.statusText,
-                                                { color: getStatusStyle(selectedAccount.briefStatus).text }
-                                            ]}>
-                                                {getStatusLabel(selectedAccount.briefStatus)}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
-
-                                <View style={styles.actionButtons}>
-                                    <TouchableOpacity
-                                        style={styles.actionBtn}
-                                        onPress={() => handleTransactionStart('debt')}
-                                    >
-                                        <Text style={styles.actionBtnText}>Borç Ekle</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
-                                        onPress={() => handleTransactionStart('payment')}
-                                    >
-                                        <Text style={styles.actionBtnText}>Ödeme Al</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={styles.closeBtn}
-                                    onPress={() => setShowDetailModal(false)}
-                                >
-                                    <Text style={styles.closeBtnText}>Kapat</Text>
-                                </TouchableOpacity>
-                            </>
-                        )}
-
-                        {selectedAccount && transactionMode && (
-                            <>
-                                <Text style={styles.modalTitle}>
-                                    {transactionMode === 'debt' ? 'Borç Ekle' : 'Ödeme Al'}
-                                </Text>
-                                <Text style={styles.transactionSubtitle}>{selectedAccount.company}</Text>
-
-                                <Text style={styles.inputLabel}>TUTAR (₺)</Text>
+                                <Text style={styles.inputLabel}>YETKİLİ ADI</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="1000"
+                                    placeholder="Ahmet Yılmaz"
                                     placeholderTextColor={COLORS.textMuted}
-                                    value={transactionAmount}
-                                    onChangeText={setTransactionAmount}
-                                    keyboardType="decimal-pad"
+                                    value={newName}
+                                    onChangeText={setNewName}
                                 />
 
-                                <Text style={styles.inputLabel}>AÇIKLAMA</Text>
+                                <Text style={styles.inputLabel}>ŞİRKET</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Proje bedeli, ödeme vb."
+                                    placeholder="Tech Start A.Ş."
                                     placeholderTextColor={COLORS.textMuted}
-                                    value={transactionDescription}
-                                    onChangeText={setTransactionDescription}
-                                    multiline
-                                    numberOfLines={3}
+                                    value={newCompany}
+                                    onChangeText={setNewCompany}
                                 />
 
-                                <Text style={styles.inputLabel}>TARİH</Text>
+                                <Text style={styles.inputLabel}>E-POSTA</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="YYYY-MM-DD"
+                                    placeholder="info@firma.com"
                                     placeholderTextColor={COLORS.textMuted}
-                                    value={transactionDate}
-                                    onChangeText={setTransactionDate}
+                                    value={newEmail}
+                                    onChangeText={setNewEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                />
+
+                                <Text style={styles.inputLabel}>ŞİFRE</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="••••••••"
+                                    placeholderTextColor={COLORS.textMuted}
+                                    value={newPassword}
+                                    onChangeText={setNewPassword}
+                                    secureTextEntry
                                 />
 
                                 <View style={styles.modalButtons}>
                                     <TouchableOpacity
                                         style={styles.cancelBtn}
-                                        onPress={() => setTransactionMode(null)}
-                                        disabled={submittingTransaction}
+                                        onPress={() => setShowModal(false)}
                                     >
-                                        <Text style={styles.cancelBtnText}>Geri</Text>
+                                        <Text style={styles.cancelBtnText}>İptal</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.submitBtn}
-                                        onPress={handleSubmitTransaction}
-                                        disabled={submittingTransaction}
-                                    >
-                                        {submittingTransaction ? (
-                                            <ActivityIndicator color={COLORS.textInverse} size="small" />
-                                        ) : (
-                                            <Text style={styles.submitBtnText}>Kaydet</Text>
-                                        )}
+                                    <TouchableOpacity style={styles.submitBtn} onPress={handleCreate}>
+                                        <Text style={styles.submitBtnText}>Oluştur</Text>
                                     </TouchableOpacity>
                                 </View>
-                            </>
-                        )}
-                    </View>
-                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </TouchableWithoutFeedback>
+            </Modal>
+
+            {/* Account Detail & Transaction Modal */}
+            <Modal visible={showDetailModal} animationType="slide" transparent>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback accessible={false}>
+                            <View style={styles.modalContent}>
+                                <View style={styles.modalHandle} />
+
+                                {selectedAccount && !transactionMode && (
+                                    <>
+                                        <Text style={styles.modalTitle}>{selectedAccount.company}</Text>
+
+                                        <View style={styles.detailSection}>
+                                            <Text style={styles.detailLabel}>YETKİLİ</Text>
+                                            <Text style={styles.detailValue}>{selectedAccount.name}</Text>
+                                        </View>
+
+                                        <View style={styles.detailSection}>
+                                            <Text style={styles.detailLabel}>E-POSTA</Text>
+                                            <Text style={styles.detailValue}>{selectedAccount.email}</Text>
+                                        </View>
+
+                                        <View style={styles.detailSection}>
+                                            <Text style={styles.detailLabel}>BAKİYE</Text>
+                                            <Text style={[
+                                                styles.detailValue,
+                                                { color: calculateBalance(selectedAccount) < 0 ? COLORS.error : COLORS.success }
+                                            ]}>
+                                                ₺{Math.abs(calculateBalance(selectedAccount)).toLocaleString('tr-TR')}
+                                            </Text>
+                                        </View>
+
+                                        {selectedAccount.briefStatus && selectedAccount.briefStatus !== 'none' && (
+                                            <View style={styles.detailSection}>
+                                                <Text style={styles.detailLabel}>DURUM</Text>
+                                                <View style={[
+                                                    styles.statusBadge,
+                                                    { backgroundColor: getStatusStyle(selectedAccount.briefStatus).bg }
+                                                ]}>
+                                                    <Text style={[
+                                                        styles.statusText,
+                                                        { color: getStatusStyle(selectedAccount.briefStatus).text }
+                                                    ]}>
+                                                        {getStatusLabel(selectedAccount.briefStatus)}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+
+                                        <View style={styles.actionButtons}>
+                                            <TouchableOpacity
+                                                style={styles.actionBtn}
+                                                onPress={() => handleTransactionStart('debt')}
+                                            >
+                                                <Text style={styles.actionBtnText}>Borç Ekle</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
+                                                onPress={() => handleTransactionStart('payment')}
+                                            >
+                                                <Text style={styles.actionBtnText}>Ödeme Al</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={styles.closeBtn}
+                                            onPress={() => setShowDetailModal(false)}
+                                        >
+                                            <Text style={styles.closeBtnText}>Kapat</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
+
+                                {selectedAccount && transactionMode && (
+                                    <>
+                                        <Text style={styles.modalTitle}>
+                                            {transactionMode === 'debt' ? 'Borç Ekle' : 'Ödeme Al'}
+                                        </Text>
+                                        <Text style={styles.transactionSubtitle}>{selectedAccount.company}</Text>
+
+                                        <Text style={styles.inputLabel}>TUTAR (₺)</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="1000"
+                                            placeholderTextColor={COLORS.textMuted}
+                                            value={transactionAmount}
+                                            onChangeText={setTransactionAmount}
+                                            keyboardType="decimal-pad"
+                                        />
+
+                                        <Text style={styles.inputLabel}>AÇIKLAMA</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Proje bedeli, ödeme vb."
+                                            placeholderTextColor={COLORS.textMuted}
+                                            value={transactionDescription}
+                                            onChangeText={setTransactionDescription}
+                                            multiline
+                                            numberOfLines={3}
+                                        />
+
+                                        <Text style={styles.inputLabel}>TARİH</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="YYYY-MM-DD"
+                                            placeholderTextColor={COLORS.textMuted}
+                                            value={transactionDate}
+                                            onChangeText={setTransactionDate}
+                                        />
+
+                                        <View style={styles.modalButtons}>
+                                            <TouchableOpacity
+                                                style={styles.cancelBtn}
+                                                onPress={() => setTransactionMode(null)}
+                                                disabled={submittingTransaction}
+                                            >
+                                                <Text style={styles.cancelBtnText}>Geri</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={styles.submitBtn}
+                                                onPress={handleSubmitTransaction}
+                                                disabled={submittingTransaction}
+                                            >
+                                                {submittingTransaction ? (
+                                                    <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                                ) : (
+                                                    <Text style={styles.submitBtnText}>Kaydet</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );
