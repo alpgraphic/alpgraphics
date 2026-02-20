@@ -13,19 +13,18 @@ import {
     StyleSheet,
     TouchableWithoutFeedback,
     TouchableOpacity,
-    TextInput,
     ScrollView,
     Dimensions,
     StatusBar,
     Animated,
     ActivityIndicator,
-    KeyboardAvoidingView,
     Platform,
     Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { SPACING, API_BASE_URL } from '../lib/constants';
@@ -109,7 +108,7 @@ const TROPHIES: TrophyDef[] = [
     { id: 'god', emoji: '🌈', name: 'Renk Tanrısı', desc: '50+ puan al', check: (s) => s >= 50 },
     { id: 'veteran', emoji: '🔥', name: 'Veteran', desc: '10 kez oyna', check: (_s, st) => st.totalGames >= 10 },
     { id: 'orbmaster', emoji: '💫', name: 'Orb Ustası', desc: 'Toplam 30 orb topla', check: (_s, st) => st.totalOrbs >= 30 },
-    { id: 'top3', emoji: '🏆', name: 'Podiyum', desc: 'Liderlik tablosunda ilk 3\'e gir', check: (_s, st) => st.maxScore >= 1 },
+    { id: 'top3', emoji: '🏆', name: 'Podiyum', desc: 'İlk skorunu Game Center\'a kaydet', check: (_s, st) => st.maxScore >= 1 },
 ];
 
 // ─── Unvan Sistemi ────────────────────────────────────────────────────────────
@@ -215,8 +214,15 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const gcRef = useRef(gc);
     gcRef.current = gc;
 
+    // Kullanıcı GC'ye bağlı değilse sonsuz retry döngüsünü önler.
+    // Tek seferlik deneme: başarılı olursa gc.isReady=true, olmadıysa
+    // kullanıcı badge'e manuel tıklayabilir.
+    const gcAuthAttemptedRef = useRef(false);
+
     // ── GC Authentication: init bittikten sonra manuel tetikle ───────────────
     useEffect(() => {
+        // Daha önce denendi mi? Başarılıysa zaten isReady=true olmuştur.
+        if (gcAuthAttemptedRef.current) return;
         // 'not_authenticated' veya 'initialized' durumuna geçince authenticate et
         if (
             gc.isPlatformSupported &&
@@ -225,6 +231,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
             gc.status.state !== 'authenticating' &&
             gc.status.state !== 'uninitialized'
         ) {
+            gcAuthAttemptedRef.current = true;
             gc.authenticate().catch(() => { /* sessiz */ });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,7 +268,11 @@ export default function ChromaDashScreen({ navigation }: Props) {
 
     const getPushToken = useCallback(async (): Promise<string | null> => {
         try {
-            const tokenData = await Notifications.getExpoPushTokenAsync();
+            // SDK 49+'da projectId zorunlu, yoksa production build'lerde token alınamaz
+            const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+            const tokenData = await Notifications.getExpoPushTokenAsync(
+                projectId ? { projectId } : undefined
+            );
             return tokenData.data;
         } catch {
             return null;
@@ -343,8 +354,9 @@ export default function ChromaDashScreen({ navigation }: Props) {
         gs.phase = 'dead';
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
 
-        // Skor animasyonu başlat
+        // Overlay'i HEMEN göster — async işlemleri bekleme, UI donmasın
         animateScore(gs.score);
+        render();
 
         // Stats güncelle
         const prevStats = await SecureStore.getItemAsync(STATS_KEY)
@@ -400,8 +412,8 @@ export default function ChromaDashScreen({ navigation }: Props) {
         if (gs.score > 0) {
             submitScoreToBackend(gs.score);
         }
-
-        render();
+        // NOT: render() async işlemlerin başında çağrıldı — overlay anında açılır,
+        // setState çağrıları (setStats, setLeaderboard vs.) kendi re-render'larını tetikler.
     }, [animateScore, render, newRecordAnim, submitScoreToBackend]);
 
     // ── Oyun döngüsü ──────────────────────────────────────────────────────────
@@ -414,7 +426,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
         gs.cubeVY += GRAVITY;
         gs.cubeY += gs.cubeVY;
 
-        if (gs.cubeY < -4 || gs.cubeY + CUBE_W > gs.playH + 4) { die(gs); return; }
+        if (gs.cubeY < -4 || gs.cubeY + CUBE_W > gs.playH + 4) { void die(gs); return; }
         gs.cubeY = Math.max(-4, Math.min(gs.playH + 4 - CUBE_W, gs.cubeY));
 
         for (const o of gs.obstacles) o.x -= gs.speed;
@@ -448,7 +460,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
             }
             if (obs.x > cubeRight || obs.x + OBS_W < CUBE_X) continue;
             const band = obs.bands.find(b => cubeCenter >= b.y && cubeCenter < b.y + b.h);
-            if (!band || band.color !== cubeColor) { die(gs); return; }
+            if (!band || band.color !== cubeColor) { void die(gs); return; }
         }
 
         for (let i = gs.orbs.length - 1; i >= 0; i--) {
