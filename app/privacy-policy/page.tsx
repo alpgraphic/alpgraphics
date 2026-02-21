@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'Gizlilik Politikası – alp graphics',
-    description: 'alp graphics mobil uygulaması gizlilik politikası.',
+    title: 'Gizlilik Politikası – alpgraphics',
+    description: 'alpgraphics mobil uygulaması gizlilik politikası.',
     robots: { index: true, follow: true },
 };
 
@@ -19,14 +19,14 @@ export default function PrivacyPolicyPage() {
             }}
         >
             <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.04em', color: '#a62932', marginBottom: 40 }}>
-                alp graphics
+                alpgraphics
             </p>
 
             <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Gizlilik Politikası</h1>
             <p style={{ fontSize: 13, color: '#888', marginBottom: 36 }}>Son güncellenme: Şubat 2026</p>
 
             <p style={{ marginBottom: 20 }}>
-                Bu Gizlilik Politikası, <strong>alp graphics</strong> mobil uygulamasını kullanırken
+                Bu Gizlilik Politikası, <strong>alpgraphics</strong> mobil uygulamasını kullanırken
                 kişisel verilerinizin nasıl toplandığını, kullanıldığını ve korunduğunu açıklamaktadır.
                 Uygulamayı kullanarak bu politikayı kabul etmiş sayılırsınız.
             </p>
@@ -115,7 +115,7 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <hr style={{ border: 'none', borderTop: '1px solid #e0ddd3', margin: '40px 0 24px' }} />
-            <p style={{ fontSize: 13, color: '#888' }}>© 2026 alp graphics. Tüm hakları saklıdır.</p>
+            <p style={{ fontSize: 13, color: '#888' }}>© 2026 alpgraphics. Tüm hakları saklıdır.</p>
         </main>
     );
 }
