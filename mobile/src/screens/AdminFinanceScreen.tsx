@@ -131,6 +131,12 @@ export default function AdminFinanceScreen({ navigation }: Props) {
             return;
         }
 
+        // Guard against stale/deleted account ID
+        if (!accounts.find(a => a.id === newTransactionAccountId)) {
+            Alert.alert('Hata', 'Seçili hesap bulunamadı, lütfen yenileyin');
+            return;
+        }
+
         const amount = parseFloat(newTransactionAmount);
         if (isNaN(amount) || amount <= 0) {
             Alert.alert('Hata', 'Geçerli bir tutar girin');

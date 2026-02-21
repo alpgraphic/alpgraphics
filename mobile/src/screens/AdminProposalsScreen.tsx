@@ -303,6 +303,10 @@ export default function AdminProposalsScreen({ navigation }: Props) {
             Alert.alert('Uyarı', 'Lütfen bir başlık girin');
             return;
         }
+        if (!editing.useDirectTotal && editing.items.length === 0) {
+            Alert.alert('Uyarı', 'En az bir kalem ekleyin');
+            return;
+        }
         setSaving(true);
         try {
             const payload = { ...editing, totalAmount: eSubtotal };

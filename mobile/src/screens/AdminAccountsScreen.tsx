@@ -162,8 +162,8 @@ export default function AdminAccountsScreen({ navigation }: Props) {
                 setTransactionMode(null);
                 setTransactionAmount('');
                 setTransactionDescription('');
-                await loadAccounts(); // Refresh accounts list
-                setShowDetailModal(false);
+                setShowDetailModal(false);  // close first, then refresh in background
+                loadAccounts(); // no await — don't block modal close on network round-trip
             } else {
                 Alert.alert('Hata', result.error || 'İşlem kaydedilemedi');
             }
