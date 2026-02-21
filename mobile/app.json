@@ -44,7 +44,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-game-center",
+      "./node_modules/expo-game-center/plugin/build/index",
       [
         "expo-local-authentication",
         {
