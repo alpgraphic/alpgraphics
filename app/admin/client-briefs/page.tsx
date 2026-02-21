@@ -44,6 +44,11 @@ export default function ClientBriefsPage() {
         a.briefFormType && a.briefStatus === 'submitted'
     );
 
+    // Get accounts with approved briefs
+    const approvedBriefs = accounts.filter(a =>
+        a.briefFormType && a.briefStatus === 'approved'
+    );
+
     const handleAssignBrief = async () => {
         if (!selectedAccountId || !selectedFormType) {
             showToast('Lütfen müşteri ve form tipi seçin', 'error');
@@ -273,6 +278,49 @@ export default function ClientBriefsPage() {
                         </div>
                     )}
                 </section>
+
+                {/* Approved Briefs */}
+                {approvedBriefs.length > 0 && (
+                    <section className="mt-10">
+                        <h2 className="text-xl font-bold mb-6">Onaylanan Briefler</h2>
+                        <div className="grid grid-cols-1 gap-3">
+                            {approvedBriefs.map(account => {
+                                const template = briefTemplates.find(t => t.id === account.briefFormType);
+                                return (
+                                    <motion.div
+                                        key={account.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`${cardBg} border ${borderColor} border-l-4 border-l-green-500 rounded-xl p-5`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 bg-green-500 text-white rounded-lg flex items-center justify-center text-xl">
+                                                    {template?.icon || '📋'}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold">{account.company}</h3>
+                                                    <p className="text-xs opacity-40">
+                                                        Onaylandı: {account.briefApprovedAt ? new Date(account.briefApprovedAt).toLocaleDateString('tr-TR') : '-'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-bold text-green-500">✓ Onaylandı</span>
+                                                <button
+                                                    onClick={() => setViewBriefAccount(account)}
+                                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${isAdminNight ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'}`}
+                                                >
+                                                    Görüntüle
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
             </main>
 
             {/* Brief Response Viewer Modal */}

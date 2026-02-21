@@ -1284,7 +1284,7 @@ export default function AdminDashboard() {
                                     {accounts.filter(acc => acc.briefStatus === 'submitted').map(acc => (
                                         <div
                                             key={acc.id}
-                                            className={`p-6 rounded-xl border ${isAdminNight ? 'bg-[#0a0a0a]/40 border-white/10' : 'bg-white/60 border-black/5'}`}
+                                            className={`p-6 rounded-xl border border-l-4 border-l-yellow-500 ${isAdminNight ? 'bg-[#0a0a0a]/40 border-white/10' : 'bg-white/60 border-black/5'}`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
@@ -1317,6 +1317,7 @@ export default function AdminDashboard() {
                                                                 briefStatus: 'approved',
                                                                 briefApprovedAt: new Date().toISOString()
                                                             });
+                                                            showToast(`${acc.company} briefi onaylandı`);
                                                         }}
                                                         className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-green-500 text-white hover:bg-green-600"
                                                     >
@@ -1337,6 +1338,49 @@ export default function AdminDashboard() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Approved Briefs */}
+                        {accounts.filter(acc => acc.briefStatus === 'approved').length > 0 && (
+                            <div className="mt-10">
+                                <h3 className="text-xl font-bold mb-6">Onaylanan Briefler</h3>
+                                <div className="space-y-3">
+                                    {accounts.filter(acc => acc.briefStatus === 'approved').map(acc => (
+                                        <div
+                                            key={acc.id}
+                                            className={`p-5 rounded-xl border border-l-4 border-l-green-500 ${isAdminNight ? 'bg-[#0a0a0a]/40 border-white/10' : 'bg-white/60 border-black/5'}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-2xl">
+                                                        {acc.briefFormType === 'logo' && '✒️'}
+                                                        {acc.briefFormType === 'brand-identity' && '🎨'}
+                                                        {acc.briefFormType === 'web-design' && '🌐'}
+                                                        {acc.briefFormType === 'social-media' && '📱'}
+                                                        {acc.briefFormType === 'packaging' && '📦'}
+                                                        {acc.briefFormType === 'general' && '📋'}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold">{acc.company}</h4>
+                                                        <p className="text-xs opacity-40">
+                                                            Onaylandı: {acc.briefApprovedAt ? new Date(acc.briefApprovedAt).toLocaleDateString('tr-TR') : '-'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs font-bold text-green-500">✓ Onaylandı</span>
+                                                    <button
+                                                        onClick={() => setViewBriefAccount(acc)}
+                                                        className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${isAdminNight ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'}`}
+                                                    >
+                                                        Görüntüle
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
