@@ -251,6 +251,18 @@ export default function AdminDashboard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
+
+            // Update local state to reflect changes immediately
+            if (editCredUsername || editCredPassword) {
+                const updatedAccount = accounts.find(a => a.id === editCredAccountId);
+                if (updatedAccount) {
+                    updateAccount(editCredAccountId, {
+                        ...updatedAccount,
+                        username: editCredUsername || updatedAccount.username,
+                    });
+                }
+            }
+
             setEditCredAccountId(null);
             setEditCredUsername('');
             setEditCredPassword('');
@@ -439,8 +451,8 @@ export default function AdminDashboard() {
                                 ].map(item => (
                                     <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
                                         className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === item.id
-                                                ? 'bg-[#a62932] text-white shadow-lg'
-                                                : `opacity-60 hover:opacity-100 ${isAdminNight ? 'hover:bg-white/10' : 'hover:bg-black/5'}`
+                                            ? 'bg-[#a62932] text-white shadow-lg'
+                                            : `opacity-60 hover:opacity-100 ${isAdminNight ? 'hover:bg-white/10' : 'hover:bg-black/5'}`
                                             }`}>
                                         <span className="text-base">{item.icon}</span>
                                         {item.name}
