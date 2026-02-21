@@ -21,6 +21,9 @@
         "NSCameraUsageDescription": "Fotoğraf çekmek için kamera erişimi gereklidir",
         "NSPhotoLibraryUsageDescription": "PDF ve dosya paylaşımı için galeri erişimi gereklidir",
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.game-center": true
       }
     },
     "android": {
