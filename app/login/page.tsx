@@ -27,7 +27,7 @@ export default function LoginPage() {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password: role === 'admin' ? password : undefined, role }),
+                body: JSON.stringify({ username, password, role }),
             });
 
             const data = await response.json();

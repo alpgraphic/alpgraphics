@@ -246,11 +246,18 @@ export default function AdminDashboard() {
             const body: any = { id: editCredAccountId };
             if (editCredUsername) body.username = editCredUsername;
             if (editCredPassword) body.password = editCredPassword;
-            await fetch('/api/accounts', {
+            const res = await fetch('/api/accounts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
+
+            if (!res.ok) {
+                const data = await res.json();
+                alert('Hata: ' + (data.error || 'Kimlik bilgileri güncellenemedi.'));
+                setEditCredLoading(false);
+                return;
+            }
 
             // Update local state to reflect changes immediately
             if (editCredUsername || editCredPassword) {
