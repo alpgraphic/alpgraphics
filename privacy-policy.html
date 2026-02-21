@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gizlilik Politikası – alp graphics</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #f5f3e9;
+      color: #1a1a1a;
+      line-height: 1.7;
+      padding: 0 16px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 0 80px;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #a62932;
+      margin-bottom: 40px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    .updated {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 36px;
+    }
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 32px 0 10px;
+    }
+    p {
+      font-size: 15px;
+      color: #333;
+      margin-bottom: 14px;
+    }
+    ul {
+      padding-left: 22px;
+      margin-bottom: 14px;
+    }
+    ul li {
+      font-size: 15px;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    a { color: #a62932; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr {
+      border: none;
+      border-top: 1px solid #e0ddd3;
+      margin: 36px 0;
+    }
+    .footer {
+      font-size: 13px;
+      color: #888;
+      margin-top: 48px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">alp graphics</div>
+
+    <h1>Gizlilik Politikası</h1>
+    <p class="updated">Son güncellenme: Şubat 2026</p>
+
+    <p>
+      Bu Gizlilik Politikası, <strong>alp graphics</strong> mobil uygulamasını ("Uygulama") kullanırken
+      kişisel verilerinizin nasıl toplandığını, kullanıldığını ve korunduğunu açıklamaktadır.
+      Uygulamayı kullanarak bu politikayı kabul etmiş sayılırsınız.
+    </p>
+
+    <h2>1. Toplanan Veriler</h2>
+    <p>Uygulama aşağıdaki verileri toplayabilir:</p>
+    <ul>
+      <li><strong>Kimlik bilgileri:</strong> Ad, soyad, şirket adı ve e-posta adresi (giriş yapıldığında).</li>
+      <li><strong>Oyun verileri:</strong> ChromaDash mini oyununda elde ettiğiniz puan (skor).</li>
+      <li><strong>Apple Game Center:</strong> Game Center üzerinden kullanıcı kimliği ve görünen ad, liderlik tablosuna puan gönderimi amacıyla kullanılır.</li>
+      <li><strong>Bildirim jetonu:</strong> Uygulama bildirimleri göndermek amacıyla Expo Push Token alınabilir. Bu jeton yalnızca bildirim iletimi için kullanılır.</li>
+      <li><strong>Cihaz içi depolama:</strong> Kullanıcı adı ve kimlik doğrulama bilgileri cihazınızda güvenli depolama (SecureStore) kullanılarak saklanır; sunucuya gönderilmez.</li>
+    </ul>
+
+    <h2>2. Verilerin Kullanımı</h2>
+    <p>Toplanan veriler yalnızca şu amaçlarla kullanılır:</p>
+    <ul>
+      <li>Kullanıcının kimliğini doğrulamak ve hesabına erişim sağlamak.</li>
+      <li>Proje tekliflerini, fatura ve ödeme bilgilerini görüntülemek.</li>
+      <li>Mesajlaşma özelliğini çalıştırmak.</li>
+      <li>Oyun skorlarını liderlik tablosuna kaydetmek (Game Center ve uygulama sunucusu).</li>
+      <li>Uygulama içi bildirimler göndermek.</li>
+    </ul>
+
+    <h2>3. Apple Game Center</h2>
+    <p>
+      Uygulama, Apple Game Center hizmetini kullanmaktadır. Game Center aracılığıyla elde ettiğiniz
+      oyun skorları ve Game Center kimliğiniz, liderlik tablosunda görüntülenmek üzere Apple'ın
+      altyapısına ve uygulama sunucusuna iletilir. Apple'ın veri işleme politikası için
+      <a href="https://www.apple.com/legal/privacy/tr/" target="_blank" rel="noopener">Apple Gizlilik Politikası</a>'na başvurun.
+    </p>
+
+    <h2>4. Üçüncü Taraf Servisler</h2>
+    <p>Uygulama şu üçüncü taraf hizmetleri kullanmaktadır:</p>
+    <ul>
+      <li><strong>Apple Game Center</strong> – puan ve liderlik tablosu yönetimi.</li>
+      <li><strong>Expo Push Notifications</strong> – bildirim iletimi (Expo / Render altyapısı).</li>
+    </ul>
+    <p>Bu hizmetler kendi gizlilik politikaları kapsamında çalışmaktadır.</p>
+
+    <h2>5. Veri Güvenliği</h2>
+    <p>
+      Kullanıcı kimlik bilgileri cihazınızda şifreli (Expo SecureStore) olarak saklanır.
+      Sunucu iletişimi HTTPS üzerinden gerçekleştirilir.
+      Üçüncü şahıslarla kişisel verileriniz paylaşılmaz; ticari amaçla satılmaz.
+    </p>
+
+    <h2>6. Çocukların Gizliliği</h2>
+    <p>
+      Uygulama 13 yaşın altındaki çocuklara yönelik değildir ve bu yaş grubuna ait bilerek
+      kişisel veri toplanmaz. Böyle bir durumu fark ederseniz lütfen bizimle iletişime geçin.
+    </p>
+
+    <h2>7. Haklarınız</h2>
+    <p>
+      Kişisel verilerinize erişme, düzeltme veya silme talebinde bulunmak için
+      aşağıdaki iletişim adresi üzerinden bizimle iletişime geçebilirsiniz.
+    </p>
+
+    <h2>8. Politika Değişiklikleri</h2>
+    <p>
+      Bu politika zaman zaman güncellenebilir. Değişiklikler bu sayfada yayımlanır.
+      Uygulamayı kullanmaya devam etmeniz, güncellenen politikayı kabul ettiğiniz anlamına gelir.
+    </p>
+
+    <h2>9. İletişim</h2>
+    <p>
+      Sorularınız için:<br />
+      <a href="mailto:alpgraphicstudio@gmail.com">alpgraphicstudio@gmail.com</a><br />
+      <a href="https://alpgraphicstudio.com" target="_blank" rel="noopener">alpgraphicstudio.com</a>
+    </p>
+
+    <hr />
+    <p class="footer">© 2026 alp graphics. Tüm hakları saklıdır.</p>
+  </div>
+</body>
+</html>

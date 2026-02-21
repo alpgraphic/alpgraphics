@@ -194,7 +194,7 @@ export default function AdminAccountsScreen({ navigation }: Props) {
     };
 
     const calculateBalance = (account: Account) => {
-        return account.balance || (account.totalDebt - account.totalPaid);
+        return account.balance ?? (account.totalPaid - account.totalDebt);
     };
 
     return (

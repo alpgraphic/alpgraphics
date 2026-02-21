@@ -31,7 +31,7 @@ interface Message {
 
 export default function ChatScreen({ navigation, route }: ChatScreenProps) {
     const insets = useSafeAreaInsets();
-    const { accountId, companyName = '', accountName = '' } = route.params;
+    const { accountId, companyName = '', accountName = '' } = route.params ?? {};
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
