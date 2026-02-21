@@ -176,34 +176,6 @@ export default function DashboardScreen({ navigation }: Props) {
                     </TouchableOpacity>
                 )}
 
-                {/* Account Balance */}
-                {account && (
-                    <View style={styles.balanceCard}>
-                        <View style={styles.balanceRow}>
-                            <View style={styles.balanceItem}>
-                                <Text style={styles.balanceLabel}>Toplam Borç</Text>
-                                <Text style={[styles.balanceValue, { color: COLORS.error || '#cf222e' }]}>
-                                    ₺{(account.totalDebt || 0).toLocaleString()}
-                                </Text>
-                            </View>
-                            <View style={styles.balanceDivider} />
-                            <View style={styles.balanceItem}>
-                                <Text style={styles.balanceLabel}>Ödenen</Text>
-                                <Text style={[styles.balanceValue, { color: COLORS.success || '#1a7f37' }]}>
-                                    ₺{(account.totalPaid || 0).toLocaleString()}
-                                </Text>
-                            </View>
-                            <View style={styles.balanceDivider} />
-                            <View style={styles.balanceItem}>
-                                <Text style={styles.balanceLabel}>Bakiye</Text>
-                                <Text style={[styles.balanceValue, { color: COLORS.primary }]}>
-                                    ₺{(account.balance || 0).toLocaleString()}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
                 {/* Projects Section */}
                 {projects.length > 0 && (
                     <View style={styles.sectionContainer}>
