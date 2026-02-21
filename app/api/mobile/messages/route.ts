@@ -195,10 +195,17 @@ export async function POST(request: NextRequest) {
         const result = await col.insertOne(message as any);
 
         // Push notification to recipient
+        // We exclude the sender's own push token so that if admin tested
+        // the app as a client on the same device (same push token registered
+        // for both accounts), they don't receive a notification they sent.
         try {
+            const senderTokens = await getTokensForUser(session.userId);
+
             if (session.role === 'client') {
-                // Notify admin
-                const adminTokens = await getAdminTokens();
+                // Notify admin — skip tokens that also belong to the sender
+                const adminTokens = (await getAdminTokens()).filter(
+                    t => !senderTokens.includes(t)
+                );
                 if (adminTokens.length > 0) {
                     await sendPushNotification(adminTokens, {
                         title: `${senderName} mesaj gönderdi`,
@@ -207,8 +214,10 @@ export async function POST(request: NextRequest) {
                     });
                 }
             } else {
-                // Notify client
-                const clientTokens = await getTokensForUser(resolvedAccountId);
+                // Notify client — skip tokens that also belong to the sender
+                const clientTokens = (await getTokensForUser(resolvedAccountId)).filter(
+                    t => !senderTokens.includes(t)
+                );
                 if (clientTokens.length > 0) {
                     await sendPushNotification(clientTokens, {
                         title: 'Alp Graphics',
