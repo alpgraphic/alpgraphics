@@ -314,6 +314,10 @@ interface AgencyContextType {
 
     isAdminNight: boolean;
     toggleAdminTheme: () => void;
+
+    // Error notification
+    lastError: string | null;
+    clearError: () => void;
 }
 
 const AgencyContext = createContext<AgencyContextType | undefined>(undefined);
@@ -382,6 +386,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
     // Theme State
     const [isAdminNight, setIsAdminNight] = useState(true);
+
+    // Error notification state
+    const [lastError, setLastError] = useState<string | null>(null);
+    const clearError = () => setLastError(null);
 
     // Hydration Fix
     // Unified Persistence (Hydration & Saving)
@@ -550,7 +558,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             }
         } catch (error) {
             console.error("❌ Failed to create project:", error);
-            alert("Proje kaydedilemedi!");
+            setLastError("Proje kaydedilemedi!");
         }
     };
 
@@ -603,7 +611,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             });
         } catch (error) {
             console.error("Failed to delete project:", error);
-            alert("Proje silinemedi!");
+            setLastError("Proje silinemedi!");
         }
     };
 
@@ -697,12 +705,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             } else {
                 // Revert on error
                 setAccounts(prev => prev.filter(acc => acc.id !== tempId));
-                alert(data.error || 'Hesap oluşturulamadı');
+                setLastError(data.error || 'Hesap oluşturulamadı');
             }
         } catch (error) {
             console.error("Failed to create account:", error);
             setAccounts(prev => prev.filter(acc => acc.id !== tempId));
-            alert('Bağlantı hatası');
+            setLastError('Bağlantı hatası');
         }
     };
 
@@ -755,7 +763,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             if (!res.ok) {
                 // Revert on error
                 setAccounts(previousAccounts);
-                alert('Hesap silinemedi');
+                setLastError('Hesap silinemedi');
             }
         } catch (error) {
             console.error("Failed to delete account:", error);
@@ -799,14 +807,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
                 // Revert state on API error
                 console.error("Failed to save transaction, reverting...");
                 setAccounts(previousAccounts);
-                alert('İşlem kaydedilemedi. Lütfen tekrar deneyin.');
+                setLastError('İşlem kaydedilemedi. Lütfen tekrar deneyin.');
             }
 
         } catch (error) {
             console.error("Transaction API error", error);
             // Revert state on network error
             setAccounts(previousAccounts);
-            alert('Sunucuya bağlanılamadı. İşlem geri alındı.');
+            setLastError('Sunucuya bağlanılamadı. İşlem geri alındı.');
         }
     };
 
@@ -984,7 +992,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             proposals, addProposal, updateProposal, deleteProposal,
             linkProjectToAccount, linkProjectToProposal, linkProjectToBrief, linkProjectToBrandPage,
             uploadLogo, deleteLogo, uploadFont, deleteFont, setGlobalFont,
-            isAdminNight, toggleAdminTheme
+            isAdminNight, toggleAdminTheme,
+            lastError, clearError
         }}>
             {children}
         </AgencyContext.Provider>

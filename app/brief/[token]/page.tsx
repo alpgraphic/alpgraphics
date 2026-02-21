@@ -20,6 +20,7 @@ export default function BriefFormPage() {
     const [responses, setResponses] = useState<Record<string, string | string[]>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Fetch form data based on token
     useEffect(() => {
@@ -84,10 +85,10 @@ export default function BriefFormPage() {
             if (data.success) {
                 setIsSubmitted(true);
             } else {
-                alert(data.error || 'Gönderim başarısız');
+                setSubmitError(data.error || 'Gönderim başarısız');
             }
         } catch (err) {
-            alert('Bağlantı hatası. Lütfen tekrar deneyin.');
+            setSubmitError('Bağlantı hatası. Lütfen tekrar deneyin.');
         }
 
         setIsSubmitting(false);
@@ -265,11 +266,19 @@ export default function BriefFormPage() {
                         </motion.div>
                     ))}
 
+                    {/* Submit Error */}
+                    {submitError && (
+                        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm text-center">
+                            {submitError}
+                        </div>
+                    )}
+
                     {/* Submit Button */}
                     <div className="pt-8">
                         <button
                             type="submit"
                             disabled={isSubmitting}
+                            onClick={() => setSubmitError(null)}
                             className={`w-full py-4 rounded-xl text-lg font-bold transition-all ${isSubmitting
                                     ? 'bg-gray-400 cursor-not-allowed'
                                     : 'bg-[#a62932] hover:bg-[#c4323d] text-white shadow-lg shadow-[#a62932]/20'

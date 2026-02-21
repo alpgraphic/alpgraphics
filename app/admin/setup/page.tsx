@@ -61,7 +61,6 @@ export default function SetupPage() {
             const data = await res.json();
 
             if (data.success) {
-                alert('Admin Account Created! Redirecting to login...');
                 router.push('/login');
             } else {
                 setError(data.error || 'Verification failed');

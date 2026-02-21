@@ -30,6 +30,7 @@ export default function ClientDashboard() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [responses, setResponses] = useState<Record<string, string | string[]>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Get brief template
     const template = useMemo(() => {
@@ -119,7 +120,7 @@ export default function ClientDashboard() {
             }
         } catch (error) {
             console.error('Brief submission error:', error);
-            alert('Brief gönderilemedi. Lütfen tekrar deneyin.');
+            setSubmitError('Brief gönderilemedi. Lütfen tekrar deneyin.');
         } finally {
             setIsSubmitting(false);
         }
@@ -185,7 +186,7 @@ export default function ClientDashboard() {
                             onClick={handleLogout}
                             className="text-xs font-bold opacity-40 hover:opacity-100 uppercase tracking-widest px-3 py-2 rounded-lg hover:bg-black/5 transition-colors"
                         >
-                            Cikis
+                            Çıkış
                         </button>
                     </div>
                 </div>
@@ -359,9 +360,15 @@ export default function ClientDashboard() {
                                 ))}
 
                                 <div className="pt-6">
+                                    {submitError && (
+                                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm text-center mb-4">
+                                            {submitError}
+                                        </div>
+                                    )}
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
+                                        onClick={() => setSubmitError(null)}
                                         className={`w-full py-4 rounded-xl text-lg font-bold transition-all ${isSubmitting
                                             ? 'bg-gray-400 cursor-not-allowed text-white'
                                             : 'bg-[#a62932] hover:bg-[#c4323d] text-white shadow-lg shadow-[#a62932]/20'

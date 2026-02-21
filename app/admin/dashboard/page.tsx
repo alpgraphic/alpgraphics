@@ -14,7 +14,7 @@ import CacheManager from "@/components/admin/CacheManager";
 import { briefTemplates } from "@/lib/briefTypes";
 
 export default function AdminDashboard() {
-    const { projects, addProject, deleteProject, invoices, addInvoice, expenses, addExpense, removeExpense, messages, markMessageRead, accounts, addAccount, updateAccount, deleteAccount, addTransaction, proposals, addProposal, updateProposal, deleteProposal, isAdminNight, toggleAdminTheme } = useAgency();
+    const { projects, addProject, deleteProject, invoices, addInvoice, expenses, addExpense, removeExpense, messages, markMessageRead, accounts, addAccount, updateAccount, deleteAccount, addTransaction, proposals, addProposal, updateProposal, deleteProposal, isAdminNight, toggleAdminTheme, lastError, clearError } = useAgency();
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -34,6 +34,14 @@ export default function AdminDashboard() {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
+
+    // Show context-level errors as toast
+    useEffect(() => {
+        if (lastError) {
+            showToast(lastError, 'error');
+            clearError();
+        }
+    }, [lastError]);
 
     // Modal States
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -486,7 +494,7 @@ export default function AdminDashboard() {
                                     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) { console.error(e); }
                                     localStorage.removeItem('alpa_auth'); localStorage.removeItem('client_session'); window.location.href = '/login';
                                 }} className="flex items-center gap-3 opacity-50 hover:opacity-100 transition-opacity w-full text-left py-2 text-sm">
-                                    <span>🚪</span> Cikis Yap
+                                    <span>🚪</span> Çıkış Yap
                                 </button>
                             </div>
                         </motion.aside>
