@@ -23,32 +23,22 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
     const insets = useSafeAreaInsets();
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const handleLogin = async () => {
-        const trimmedEmail = email.trim().toLowerCase();
+        const trimmedUsername = username.trim().toLowerCase();
 
-        if (!trimmedEmail || !password) {
-            Alert.alert('', 'E-posta ve şifre gerekli');
-            return;
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-            Alert.alert('', 'Geçerli bir e-posta adresi girin');
-            return;
-        }
-
-        if (password.length < 6) {
-            Alert.alert('', 'Şifre en az 6 karakter olmalıdır');
+        if (!trimmedUsername) {
+            Alert.alert('', 'Kullanıcı adı gerekli');
             return;
         }
 
         setIsLoading(true);
 
         try {
-            const result = await login(trimmedEmail, password);
+            const result = await login(trimmedUsername, password || undefined);
 
             if (result.requires2FA && result.adminId) {
                 navigation.navigate('TwoFactor', { adminId: result.adminId });
@@ -60,7 +50,7 @@ export default function LoginScreen({ navigation }: Props) {
                     navigation.replace('Dashboard');
                 }
             } else {
-                Alert.alert('Giriş Başarısız', result.error || 'E-posta veya şifre hatalı');
+                Alert.alert('Giriş Başarısız', result.error || 'Kullanıcı adı hatalı');
             }
         } catch (error) {
             Alert.alert('Hata', 'Bağlantı hatası. Lütfen tekrar deneyin.');
@@ -98,19 +88,21 @@ export default function LoginScreen({ navigation }: Props) {
 
                     {/* Inputs */}
                     <View style={styles.inputSection}>
-                        <Text style={styles.inputLabel}>E-posta</Text>
+                        <Text style={styles.inputLabel}>Kullanıcı Adı</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="ornek@firma.com"
+                            placeholder="kullaniciadiniz"
                             placeholderTextColor={COLORS.textMuted}
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
+                            value={username}
+                            onChangeText={setUsername}
+                            keyboardType="default"
                             autoCapitalize="none"
                             autoCorrect={false}
                         />
 
-                        <Text style={[styles.inputLabel, { marginTop: SPACING.md }]}>Şifre</Text>
+                        <Text style={[styles.inputLabel, { marginTop: SPACING.md }]}>
+                            Şifre <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0 }}>(sadece admin)</Text>
+                        </Text>
                         <TextInput
                             style={styles.input}
                             placeholder="••••••••"

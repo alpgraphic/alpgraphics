@@ -75,14 +75,14 @@ export function setSessionExpiredHandler(handler: () => void) {
 
 // Auth Functions
 export async function login(
-    email: string,
-    password: string
+    username: string,
+    password?: string
 ): Promise<LoginResult> {
     try {
         const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ username, password: password || undefined }),
         });
 
         const data = await response.json();

@@ -12,7 +12,7 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Form State
-    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [token, setToken] = useState("");
     const [error, setError] = useState("");
@@ -27,7 +27,7 @@ export default function LoginPage() {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, role }),
+                body: JSON.stringify({ username, password: role === 'admin' ? password : undefined, role }),
             });
 
             const data = await response.json();
@@ -61,7 +61,7 @@ export default function LoginPage() {
             const response = await fetch('/api/auth/verify-2fa', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, token }),
+                body: JSON.stringify({ username, token }),
             });
             const data = await response.json();
 
@@ -121,22 +121,15 @@ export default function LoginPage() {
 
                                 <form onSubmit={handleLogin} className="space-y-6">
                                     <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-2">E-posta</label>
-                                        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-black/10 focus:border-[#a62932] outline-none" placeholder="isim@sirket.com" />
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-2">Kullanıcı Adı</label>
+                                        <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" autoCorrect="off" className="w-full px-4 py-3 rounded-lg border border-black/10 focus:border-[#a62932] outline-none" placeholder="kullaniciadiniz" />
                                     </div>
+                                    {role === 'admin' && (
                                     <div>
                                         <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-2">Şifre</label>
-                                        <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-black/10 focus:border-[#a62932] outline-none" placeholder="••••••••" />
-                                        <div className="text-right mt-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => alert('Şifre sıfırlama linki e-posta adresinize gönderilecektir. Bu özellik yakında aktif olacak.')}
-                                                className="text-xs text-[#a62932] hover:underline opacity-70 hover:opacity-100 transition-opacity"
-                                            >
-                                                Şifremi Unuttum
-                                            </button>
-                                        </div>
+                                        <input type="password" required={role === 'admin'} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-black/10 focus:border-[#a62932] outline-none" placeholder="••••••••" />
                                     </div>
+                                    )}
                                     {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">{error}</div>}
                                     <button disabled={isLoading} className="w-full py-4 rounded-xl font-bold uppercase tracking-widest bg-[#a62932] text-white shadow-lg hover:bg-[#c4323d] hover:shadow-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                                         {isLoading ? (

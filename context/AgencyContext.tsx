@@ -248,7 +248,8 @@ export interface Account {
     name: string; // Contact Name
     company: string; // Company Name
     email: string;
-    password: string; // Client panel login password
+    username?: string; // Unique login identifier
+    password?: string; // Client panel login password (optional — clients are passwordless)
     totalDebt: number; // Toplam Borçlanılan
     totalPaid: number; // Toplam Ödenen
     balance: number;   // Bakiye (Debt - Paid)
@@ -682,7 +683,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
                     name: account.name,
                     company: account.company,
                     email: account.email,
-                    password: account.password,
+                    username: account.username,
+                    password: account.password || undefined,
                     briefFormType: account.briefFormType || 'none'
                 }),
             });

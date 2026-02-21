@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
                     name: acc.name,
                     company: acc.company,
                     email: acc.email,
+                    username: acc.username,
                     balance: acc.balance || 0,
                     totalDebt: acc.totalDebt || 0,
                     totalPaid: acc.totalPaid || 0,
@@ -102,7 +103,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, company, accountId, briefStatus, briefApprovedAt } = body;
+        const { name, company, accountId, briefStatus, briefApprovedAt, username, password } = body;
 
         const accounts = await getAccountsCollection();
         const { ObjectId } = await import('mongodb');
@@ -129,6 +130,12 @@ export async function PUT(request: NextRequest) {
             }
             if (briefApprovedAt) {
                 updateFields.briefApprovedAt = new Date(briefApprovedAt);
+            }
+            if (username) {
+                updateFields.username = String(username).toLowerCase().trim();
+            }
+            if (password) {
+                updateFields.passwordHash = await bcrypt.hash(password, 12);
             }
         }
 
@@ -174,37 +181,42 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, company, email, password } = body;
+        const { name, company, email, username, password } = body;
 
-        if (!name || !company || !email || !password) {
+        if (!name || !company || !username) {
             return NextResponse.json(
-                { success: false, error: 'Tum alanlar zorunludur' },
+                { success: false, error: 'Ad, sirket ve kullanici adi zorunludur' },
                 { status: 400 }
             );
         }
 
-        // Validate email
-        const emailStr = String(email).toLowerCase().trim();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+        const usernameStr = String(username).toLowerCase().trim();
+        if (!/^[a-z0-9_.-]{3,30}$/.test(usernameStr)) {
             return NextResponse.json(
-                { success: false, error: 'Gecersiz e-posta' },
+                { success: false, error: 'Kullanici adi 3-30 karakter, harf/rakam/._- icerebilir' },
                 { status: 400 }
             );
         }
 
-        // Validate password
-        const passwordValidation = validatePassword(password);
-        if (!passwordValidation.valid) {
-            return NextResponse.json(
-                { success: false, error: 'Sifre yeterince guclu degil', details: passwordValidation.errors },
-                { status: 400 }
-            );
+        const emailStr = email ? String(email).toLowerCase().trim() : `${usernameStr}@alpgraphics.local`;
+
+        // Password optional for clients (passwordless)
+        if (password) {
+            const passwordValidation = validatePassword(password);
+            if (!passwordValidation.valid) {
+                return NextResponse.json(
+                    { success: false, error: 'Sifre yeterince guclu degil', details: passwordValidation.errors },
+                    { status: 400 }
+                );
+            }
         }
 
         const accounts = await getAccountsCollection();
 
-        // Check duplicate
-        const existing = await accounts.findOne({ email: emailStr });
+        // Check duplicate username or email
+        const existingQuery: any[] = [{ username: usernameStr }];
+        if (email) existingQuery.push({ email: emailStr });
+        const existing = await accounts.findOne({ $or: existingQuery } as any);
         if (existing) {
             return NextResponse.json(
                 { success: false, error: 'Hesap olusturulamadi' },
@@ -212,13 +224,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const passwordHash = await bcrypt.hash(password, 12);
+        const passwordHash = password ? await bcrypt.hash(password, 12) : undefined;
         const briefToken = generateBriefToken();
 
         const newAccount: DbAccount = {
             name: String(name).trim(),
             company: String(company).trim(),
             email: emailStr,
+            username: usernameStr,
             passwordHash,
             briefToken,
             totalDebt: 0,

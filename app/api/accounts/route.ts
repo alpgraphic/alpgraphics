@@ -38,6 +38,7 @@ export async function GET() {
                 name: acc.name,
                 company: acc.company,
                 email: acc.email,
+                username: acc.username,
                 totalDebt: acc.totalDebt,
                 totalPaid: acc.totalPaid,
                 balance: acc.balance,
@@ -72,34 +73,44 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, company, email, password, briefFormType } = body;
+        const { name, company, email, username, password, briefFormType } = body;
 
-        if (!name || !company || !email || !password) {
+        if (!name || !company || !username) {
             return NextResponse.json(
-                { error: 'Tüm alanlar gereklidir' },
+                { error: 'Ad, şirket ve kullanıcı adı gereklidir' },
                 { status: 400 }
             );
         }
 
-        // Validate password strength
-        const passwordValidation = validatePassword(password, email);
-        if (!passwordValidation.valid) {
+        const usernameStr = String(username).toLowerCase().trim();
+        if (!/^[a-z0-9_.-]{3,30}$/.test(usernameStr)) {
             return NextResponse.json(
-                { 
-                    error: 'Şifre gereksinimleri karşılanmıyor',
-                    details: passwordValidation.errors,
-                    suggestions: passwordValidation.suggestions
-                },
+                { error: 'Kullanıcı adı 3-30 karakter, harf/rakam/._- içerebilir' },
                 { status: 400 }
             );
+        }
+
+        // Password optional for clients (passwordless login)
+        if (password) {
+            const passwordValidation = validatePassword(password, email || usernameStr);
+            if (!passwordValidation.valid) {
+                return NextResponse.json(
+                    {
+                        error: 'Şifre gereksinimleri karşılanmıyor',
+                        details: passwordValidation.errors,
+                        suggestions: passwordValidation.suggestions
+                    },
+                    { status: 400 }
+                );
+            }
         }
 
         const accounts = await getAccountsCollection();
 
-        // Check if email exists (safe exact match)
-        const existing = await accounts.findOne({
-            email: email.toLowerCase().trim()
-        });
+        // Check if username or email already exists
+        const existingQuery: any[] = [{ username: usernameStr }];
+        if (email) existingQuery.push({ email: email.toLowerCase().trim() });
+        const existing = await accounts.findOne({ $or: existingQuery });
 
         if (existing) {
             return NextResponse.json(
@@ -108,8 +119,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Hash password
-        const passwordHash = await bcrypt.hash(password, 12);
+        // Hash password if provided (clients are passwordless by default)
+        const passwordHash = password ? await bcrypt.hash(password, 12) : undefined;
 
         // Generate brief token for client brief form access
         const briefToken = generateBriefToken();
@@ -117,7 +128,8 @@ export async function POST(request: NextRequest) {
         const newAccount: DbAccount = {
             name,
             company,
-            email: email.toLowerCase(),
+            email: email ? email.toLowerCase() : `${usernameStr}@alpgraphics.local`,
+            username: usernameStr,
             passwordHash,
             briefToken, // Unique token for brief form URL
             totalDebt: 0,
@@ -138,7 +150,8 @@ export async function POST(request: NextRequest) {
                 id: result.insertedId.toString(),
                 name,
                 company,
-                email: email.toLowerCase(),
+                email: email ? email.toLowerCase() : `${usernameStr}@alpgraphics.local`,
+                username: usernameStr,
                 briefFormType: newAccount.briefFormType,
                 briefStatus: newAccount.briefStatus,
                 briefToken: briefToken, // Return token for admin to share
@@ -229,7 +242,7 @@ export async function PUT(request: NextRequest) {
 
         // SECURITY: Only allow whitelisted fields to be updated
         const ALLOWED_FIELDS = [
-            'name', 'company', 'email', 'status',
+            'name', 'company', 'email', 'status', 'username',
             'briefFormType', 'briefStatus', 'briefResponses',
             'briefSubmittedAt', 'briefApprovedAt',
             'totalDebt', 'totalPaid', 'balance'
@@ -242,9 +255,24 @@ export async function PUT(request: NextRequest) {
             }
         }
 
-        // If email is being updated, normalize it
+        // Normalize email and username
         if (safeUpdates.email) {
             safeUpdates.email = String(safeUpdates.email).toLowerCase().trim();
+        }
+        if (safeUpdates.username) {
+            safeUpdates.username = String(safeUpdates.username).toLowerCase().trim();
+        }
+
+        // Handle password update (admin only field)
+        if (body.password) {
+            const passwordValidation = validatePassword(body.password);
+            if (!passwordValidation.valid) {
+                return NextResponse.json(
+                    { error: 'Şifre gereksinimleri karşılanmıyor', details: passwordValidation.errors },
+                    { status: 400 }
+                );
+            }
+            safeUpdates.passwordHash = await bcrypt.hash(body.password, 12);
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

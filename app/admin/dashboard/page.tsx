@@ -57,6 +57,16 @@ export default function AdminDashboard() {
     const [newAccountEmail, setNewAccountEmail] = useState('');
     const [newAccountPassword, setNewAccountPassword] = useState('');
     const [newAccountBriefType, setNewAccountBriefType] = useState<'logo' | 'brand-identity' | 'web-design' | 'social-media' | 'packaging' | 'general' | 'none'>('none');
+    const [newAccountUsername, setNewAccountUsername] = useState('');
+    // Credential edit states
+    const [editCredAccountId, setEditCredAccountId] = useState<string | null>(null);
+    const [editCredUsername, setEditCredUsername] = useState('');
+    const [editCredPassword, setEditCredPassword] = useState('');
+    const [editCredLoading, setEditCredLoading] = useState(false);
+    const [showMilestonesFor, setShowMilestonesFor] = useState<{projectId: string; projectTitle: string} | null>(null);
+    const [milestones, setMilestones] = useState<any[]>([]);
+    const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+    const [milestonesLoading, setMilestonesLoading] = useState(false);
 
     // Brief Assignment States
     const [selectedBriefAccountId, setSelectedBriefAccountId] = useState<number | string | null>(null);
@@ -208,7 +218,8 @@ export default function AdminDashboard() {
             name: newAccountName,
             company: newAccountCompany,
             email: newAccountEmail,
-            password: newAccountPassword,
+            username: newAccountUsername,
+            password: newAccountPassword || undefined,
             totalDebt: 0,
             totalPaid: 0,
             balance: 0,
@@ -224,7 +235,67 @@ export default function AdminDashboard() {
         setNewAccountCompany('');
         setNewAccountEmail('');
         setNewAccountPassword('');
+        setNewAccountUsername('');
         setNewAccountBriefType('none');
+    };
+
+    const handleSaveCredentials = async () => {
+        if (!editCredAccountId) return;
+        setEditCredLoading(true);
+        try {
+            const body: any = { id: editCredAccountId };
+            if (editCredUsername) body.username = editCredUsername;
+            if (editCredPassword) body.password = editCredPassword;
+            await fetch('/api/accounts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            setEditCredAccountId(null);
+            setEditCredUsername('');
+            setEditCredPassword('');
+            alert('Kimlik bilgileri güncellendi ✓');
+        } catch (e) {
+            alert('Hata oluştu');
+        } finally {
+            setEditCredLoading(false);
+        }
+    };
+
+    const loadMilestones = async (projectId: string) => {
+        setMilestonesLoading(true);
+        try {
+            const res = await fetch(`/api/mobile/milestones?projectId=${projectId}`);
+            const data = await res.json();
+            if (data.success) setMilestones(data.milestones || []);
+        } finally {
+            setMilestonesLoading(false);
+        }
+    };
+
+    const handleAddMilestone = async (projectId: string) => {
+        if (!newMilestoneTitle.trim()) return;
+        await fetch('/api/mobile/milestones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, title: newMilestoneTitle }),
+        });
+        setNewMilestoneTitle('');
+        loadMilestones(projectId);
+    };
+
+    const handleCompleteMilestone = async (milestoneId: string, projectId: string) => {
+        await fetch('/api/mobile/milestones', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: milestoneId, attachments: [] }),
+        });
+        loadMilestones(projectId);
+    };
+
+    const handleDeleteMilestone = async (milestoneId: string, projectId: string) => {
+        await fetch(`/api/mobile/milestones?id=${milestoneId}`, { method: 'DELETE' });
+        loadMilestones(projectId);
     };
 
     const handleAddTransaction = (e: React.FormEvent) => {
@@ -659,6 +730,16 @@ export default function AdminDashboard() {
 
                                                 <div className="flex gap-2">
                                                     <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowMilestonesFor({ projectId: String(project.id), projectTitle: project.title });
+                                                            loadMilestones(String(project.id));
+                                                        }}
+                                                        className="px-3 py-2 rounded bg-white/10 text-white text-[10px] font-bold uppercase hover:bg-white/20 transition-colors"
+                                                    >
+                                                        📋 Adımlar
+                                                    </button>
+                                                    <button
                                                         onClick={() => setSelectedProject(project)}
                                                         className="flex-1 py-2 rounded bg-[#a62932] text-white text-[10px] font-bold uppercase hover:bg-[#a62932]/80 transition-colors shadow-lg shadow-red-900/20"
                                                     >
@@ -713,6 +794,17 @@ export default function AdminDashboard() {
                                                 </span>
                                             </td>
                                             <td className="p-6 text-right flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditCredAccountId(account.id);
+                                                        setEditCredUsername(account.username || '');
+                                                        setEditCredPassword('');
+                                                    }}
+                                                    className="px-3 py-1 rounded border border-current/20 text-xs font-bold hover:bg-current/10 transition-colors"
+                                                    title="Kullanıcı adı / şifre değiştir"
+                                                >
+                                                    🔑
+                                                </button>
                                                 <button
                                                     onClick={() => {
                                                         setHistoryAccountId(account.id);
@@ -1675,27 +1767,35 @@ export default function AdminDashboard() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">E-posta (Giriş için)</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Kullanıcı Adı (Giriş için) *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="örn: ahmetyilmaz"
+                                            value={newAccountUsername}
+                                            onChange={e => setNewAccountUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                                            required
+                                            minLength={3}
+                                            maxLength={30}
+                                            className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">E-posta (İletişim, opsiyonel)</label>
                                         <input
                                             type="email"
                                             placeholder="örn: info@firma.com"
                                             value={newAccountEmail}
                                             onChange={e => setNewAccountEmail(e.target.value)}
-                                            required
                                             className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Şifre (Min 8 karakter + 1 rakam)</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Şifre (opsiyonel — müşteri girişi şifresiz)</label>
                                         <input
                                             type="text"
-                                            placeholder="örn: sifre123"
+                                            placeholder="Boş bırakılabilir"
                                             value={newAccountPassword}
                                             onChange={e => setNewAccountPassword(e.target.value)}
-                                            required
-                                            minLength={8}
-                                            pattern=".*[0-9].*"
-                                            title="En az 8 karakter ve 1 rakam içermelidir"
                                             className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
                                         />
                                     </div>
@@ -2363,6 +2463,143 @@ export default function AdminDashboard() {
                         </motion.div>
                     )
                 }
+
+                {/* Credential Edit Mini-Modal */}
+                {editCredAccountId && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => setEditCredAccountId(null)}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className={`p-8 rounded-2xl w-full max-w-sm ${isAdminNight ? 'bg-[#0a0a0a] border border-white/10' : 'bg-white'}`}
+                        >
+                            <h3 className="text-lg font-bold mb-6">🔑 Kimlik Bilgilerini Düzenle</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Yeni Kullanıcı Adı</label>
+                                    <input
+                                        placeholder="Boş bırakırsan değişmez"
+                                        value={editCredUsername}
+                                        onChange={e => setEditCredUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                                        className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Yeni Şifre (müşteri için gerekli değil)</label>
+                                    <input
+                                        type="password"
+                                        placeholder="Boş bırakırsan değişmez"
+                                        value={editCredPassword}
+                                        onChange={e => setEditCredPassword(e.target.value)}
+                                        className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        onClick={() => setEditCredAccountId(null)}
+                                        className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase border ${isAdminNight ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/5'}`}
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCredentials}
+                                        disabled={editCredLoading || (!editCredUsername && !editCredPassword)}
+                                        className="flex-1 py-3 rounded-xl text-xs font-bold uppercase bg-[#a62932] text-white disabled:opacity-50 hover:bg-[#c4323d] transition-colors"
+                                    >
+                                        {editCredLoading ? 'Kaydediliyor...' : 'Kaydet'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Milestone Management Modal */}
+                {showMilestonesFor && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => setShowMilestonesFor(null)}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className={`rounded-2xl w-full max-w-lg overflow-hidden ${isAdminNight ? 'bg-[#0a0a0a] border border-white/10' : 'bg-white'}`}
+                            style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+                        >
+                            <div className={`px-6 py-5 border-b flex justify-between items-center ${isAdminNight ? 'border-white/10' : 'border-black/5'}`}>
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-0.5">Proje Adımları</p>
+                                    <h3 className="text-base font-bold">{showMilestonesFor.projectTitle}</h3>
+                                </div>
+                                <button onClick={() => setShowMilestonesFor(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/5 text-black/40">✕</button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto flex-1">
+                                {milestonesLoading ? (
+                                    <div className="text-center py-8 opacity-40 text-sm">Yükleniyor...</div>
+                                ) : milestones.length === 0 ? (
+                                    <div className="text-center py-8 opacity-40">
+                                        <div className="text-3xl mb-3">📋</div>
+                                        <p className="text-sm">Henüz adım eklenmemiş</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 mb-4">
+                                        {milestones.map((m: any, i: number) => (
+                                            <div key={m.id} className={`p-4 rounded-xl border flex items-center gap-3 ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/[0.02]'}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${m.status === 'completed' ? 'bg-green-500/20 text-green-500' : 'bg-black/10 text-black/40'}`}>
+                                                    {m.status === 'completed' ? '✓' : i + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-sm truncate">{m.title}</p>
+                                                    {m.status === 'completed' && (
+                                                        <p className="text-[10px] text-green-500 mt-0.5">
+                                                            Tamamlandı {m.attachments?.length > 0 ? `· ${m.attachments.length} görsel` : ''}
+                                                            {m.feedback && Object.keys(m.feedback).length > 0 && ` · 👍${Object.values(m.feedback).filter((f: any) => f === 'liked').length} 👎${Object.values(m.feedback).filter((f: any) => f === 'disliked').length}`}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2 flex-shrink-0">
+                                                    {m.status === 'pending' && (
+                                                        <button
+                                                            onClick={() => handleCompleteMilestone(m.id, showMilestonesFor!.projectId)}
+                                                            className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
+                                                        >
+                                                            ✓ Tamamla
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleDeleteMilestone(m.id, showMilestonesFor!.projectId)}
+                                                        className="px-2 py-1.5 rounded-lg text-[10px] text-red-500/60 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className={`flex gap-2 pt-4 border-t ${isAdminNight ? 'border-white/10' : 'border-black/5'}`}>
+                                    <input
+                                        placeholder="Yeni adım başlığı..."
+                                        value={newMilestoneTitle}
+                                        onChange={e => setNewMilestoneTitle(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddMilestone(showMilestonesFor!.projectId)}
+                                        className={`flex-1 px-4 py-2.5 rounded-lg border text-sm ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
+                                    />
+                                    <button
+                                        onClick={() => handleAddMilestone(showMilestonesFor!.projectId)}
+                                        disabled={!newMilestoneTitle.trim()}
+                                        className="px-4 py-2.5 rounded-lg text-sm font-bold bg-[#a62932] text-white disabled:opacity-40 hover:bg-[#c4323d] transition-colors"
+                                    >
+                                        + Ekle
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
             </AnimatePresence >
         </div >
     );

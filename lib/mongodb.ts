@@ -51,6 +51,7 @@ export interface DbAccount {
     name: string;
     company: string;
     email: string;
+    username?: string; // Unique login identifier (replaces email for auth)
     passwordHash?: string;
     // password field removed - only passwordHash should be used
     twoFactorSecret?: string; // 2FA Secret Key
@@ -291,8 +292,9 @@ export async function ensureIndexes(): Promise<void> {
     try {
         const db = await getDb();
 
-        // Accounts: unique email, briefToken lookup
+        // Accounts: unique email, unique username (sparse), briefToken lookup
         await db.collection('accounts').createIndex({ email: 1 }, { unique: true });
+        await db.collection('accounts').createIndex({ username: 1 }, { unique: true, sparse: true });
         await db.collection('accounts').createIndex({ briefToken: 1 }, { sparse: true });
 
         // Sessions: token lookup, auto-expire

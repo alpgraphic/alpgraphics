@@ -15,14 +15,15 @@ interface TokenResponse {
         name: string;
         email: string;
         company: string;
+        username?: string;
     };
     error?: string;
 }
 
 // Generic error to prevent user enumeration
-const INVALID_CREDENTIALS_MSG = 'E-posta veya şifre hatalı';
+const INVALID_CREDENTIALS_MSG = 'Kullanıcı adı veya şifre hatalı';
 
-// POST /api/mobile/auth - Login (auto-detect role from credentials)
+// POST /api/mobile/auth - Login (username-based, client passwordless)
 export async function POST(request: NextRequest): Promise<NextResponse<TokenResponse>> {
     try {
         const ip = getClientIP(request);
@@ -37,91 +38,92 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
         }
 
         const body = await request.json();
-        const { email, password } = body;
+        const { username, password } = body;
 
-        if (!email || !password) {
+        if (!username) {
             return NextResponse.json(
-                { success: false, error: 'Email ve password gereklidir' },
+                { success: false, error: 'Kullanıcı adı gereklidir' },
                 { status: 400 }
             );
         }
 
-        // Validate & sanitize email
-        const emailStr = String(email).toLowerCase().trim();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+        const usernameStr = String(username).toLowerCase().trim();
+        const accounts = await getAccountsCollection();
+
+        // Find account by username field, or fall back to email (backward compat)
+        const account = await accounts.findOne({
+            $or: [
+                { username: usernameStr },
+                { email: usernameStr }
+            ]
+        } as any);
+
+        if (!account) {
+            // Constant-time dummy compare to prevent timing attacks
+            if (password) await bcrypt.compare(password, '$2a$12$invalidhashpaddingtomakeitsamelengthasbcrypt');
             return NextResponse.json(
                 { success: false, error: INVALID_CREDENTIALS_MSG },
                 { status: 401 }
             );
         }
 
-        const accounts = await getAccountsCollection();
+        const isAdmin = account.role === 'admin';
 
-        // Auto-detect: first try admin, then client
-        const admin = await accounts.findOne({ email: emailStr, role: 'admin' });
-
-        if (admin && admin.passwordHash) {
-            const isValidPassword = await bcrypt.compare(password, admin.passwordHash);
-            if (isValidPassword) {
-                // Admin requires 2FA - always
-                if (admin.twoFactorSecret) {
-                    return NextResponse.json({
-                        success: true,
-                        requires2FA: true,
-                        adminId: admin._id!.toString(),
-                        role: 'admin',
-                    });
-                }
-
-                // No 2FA secret set — block login (must set up 2FA first via web)
+        if (isAdmin) {
+            // Admin requires password
+            if (!password || !account.passwordHash) {
                 return NextResponse.json(
-                    { success: false, error: '2FA kurulumu eksik. Lutfen web panelden 2FA ayarlayin.' },
-                    { status: 403 }
+                    { success: false, error: INVALID_CREDENTIALS_MSG },
+                    { status: 401 }
                 );
             }
-        }
 
-        // Try client login
-        const account = await accounts.findOne({
-            email: emailStr,
-            $or: [
-                { role: 'client' },
-                { role: { $exists: false } }
-            ]
-        } as any);
-
-        if (account && account.passwordHash) {
             const isValidPassword = await bcrypt.compare(password, account.passwordHash);
-            if (isValidPassword) {
-                // Create DB-backed session
-                const tokens = await createMobileSession(
-                    account._id!.toString(),
-                    account.email,
-                    'client'
+            if (!isValidPassword) {
+                return NextResponse.json(
+                    { success: false, error: INVALID_CREDENTIALS_MSG },
+                    { status: 401 }
                 );
+            }
 
+            // Admin requires 2FA
+            if (account.twoFactorSecret) {
                 return NextResponse.json({
                     success: true,
-                    accessToken: tokens.accessToken,
-                    refreshToken: tokens.refreshToken,
-                    expiresIn: 15 * 60,
-                    role: 'client',
-                    account: {
-                        id: account._id!.toString(),
-                        name: account.name,
-                        email: account.email,
-                        company: account.company,
-                    },
+                    requires2FA: true,
+                    adminId: account._id!.toString(),
+                    role: 'admin',
                 });
             }
+
+            // No 2FA secret set — block login
+            return NextResponse.json(
+                { success: false, error: '2FA kurulumu eksik. Lutfen web panelden 2FA ayarlayin.' },
+                { status: 403 }
+            );
         }
 
-        // Neither admin nor client matched — constant-time dummy comparison to prevent timing attacks
-        await bcrypt.compare(password, '$2a$12$invalidhashpaddingtomakeitsamelengthasbcrypt');
-        return NextResponse.json(
-            { success: false, error: INVALID_CREDENTIALS_MSG },
-            { status: 401 }
+        // Client login — passwordless
+        const tokens = await createMobileSession(
+            account._id!.toString(),
+            account.email,
+            'client'
         );
+
+        return NextResponse.json({
+            success: true,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresIn: 15 * 60,
+            role: 'client',
+            account: {
+                id: account._id!.toString(),
+                name: account.name,
+                email: account.email,
+                company: account.company,
+                username: account.username,
+            },
+        });
 
     } catch (error) {
         console.error('Mobile auth error:', error);

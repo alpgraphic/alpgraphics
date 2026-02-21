@@ -23,15 +23,15 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { email, token } = body;
+        const { username, token } = body;
 
-        if (!email || !token) {
-            return NextResponse.json({ error: 'Email ve kod gereklidir' }, { status: 400 });
+        if (!username || !token) {
+            return NextResponse.json({ error: 'Kullanıcı adı ve kod gereklidir' }, { status: 400 });
         }
 
         const accounts = await getAccountsCollection();
-        const emailStr = String(email).toLowerCase().trim();
-        const user = await accounts.findOne({ email: emailStr, role: 'admin' });
+        const usernameStr = String(username).toLowerCase().trim();
+        const user = await accounts.findOne({ $or: [{ username: usernameStr }, { email: usernameStr }], role: 'admin' } as any);
 
         if (!user || !user.twoFactorSecret) {
             return NextResponse.json({ error: 'Doğrulama başarısız' }, { status: 401 });
