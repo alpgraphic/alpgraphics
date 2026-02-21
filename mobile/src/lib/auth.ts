@@ -76,13 +76,13 @@ export function setSessionExpiredHandler(handler: () => void) {
 // Auth Functions
 export async function login(
     username: string,
-    password?: string
+    password?: string // optional only to support admin flow where 2FA follows
 ): Promise<LoginResult> {
     try {
         const response = await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password: password || undefined }),
+            body: JSON.stringify({ username, password }),
         });
 
         const data = await response.json();

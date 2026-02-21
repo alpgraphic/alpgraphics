@@ -79,7 +79,16 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Client login — passwordless
+        // Client login — requires password
+        if (!password || !user.passwordHash) {
+            return NextResponse.json({ error: INVALID_CREDENTIALS_MSG }, { status: 401 });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+        if (!isValidPassword) {
+            return NextResponse.json({ error: INVALID_CREDENTIALS_MSG }, { status: 401 });
+        }
+
         const userAgent = request.headers.get('user-agent') || undefined;
         await createSession(user._id!.toString(), user.email, 'client', ip, userAgent);
 

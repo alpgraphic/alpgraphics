@@ -103,7 +103,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
             );
         }
 
-        // Client login — passwordless
+        // Client login — requires password
+        if (!password || !account.passwordHash) {
+            return NextResponse.json(
+                { success: false, error: INVALID_CREDENTIALS_MSG },
+                { status: 401 }
+            );
+        }
+
+        const isValidPassword = await bcrypt.compare(password, account.passwordHash);
+        if (!isValidPassword) {
+            return NextResponse.json(
+                { success: false, error: INVALID_CREDENTIALS_MSG },
+                { status: 401 }
+            );
+        }
+
         const tokens = await createMobileSession(
             account._id!.toString(),
             account.email,

@@ -101,7 +101,7 @@ export default function LoginScreen({ navigation }: Props) {
                         />
 
                         <Text style={[styles.inputLabel, { marginTop: SPACING.md }]}>
-                            Şifre <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0 }}>(sadece admin)</Text>
+                            Şifre
                         </Text>
                         <TextInput
                             style={styles.input}
