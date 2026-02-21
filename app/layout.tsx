@@ -18,9 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
     const settings = await collection.findOne({ key: 'scene' });
 
     return {
-      title: settings?.seoTitle || "alpgraphics | Portfolio",
+      title: settings?.seoTitle || "alpgraphics | Studio",
       description: settings?.seoDescription || "Digital Experience Boundaries",
-      keywords: settings?.seoKeywords || "design, digital experience, portfolio",
+      keywords: settings?.seoKeywords || "design, digital experience, studio",
       robots: {
         index: true,
         follow: true,
@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   } catch (error) {
     return {
-      title: "alpgraphics | Portfolio",
+      title: "alpgraphics | Studio",
       description: "Digital Experience Boundaries",
     };
   }
