@@ -116,21 +116,25 @@ function generateProposalHtml(proposal: Proposal): string {
 <html lang="tr">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=794" />
 <style>
+  /* width=794 → A4 kağıt genişliği (210mm @ 96dpi ≈ 794px)
+     Telefonda da masaüstünde de aynı genişlikte render edilir. */
+  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 794px; }
   body { font-family: Arial, Helvetica, sans-serif; padding: 48px 56px; color: #1a1a1a; background: #fff; font-size: 14px; }
   .header { margin-bottom: 40px; border-bottom: 3px solid #a62932; padding-bottom: 24px; }
   .brand { font-size: 28px; font-weight: 900; color: #a62932; letter-spacing: -1px; }
   .brand-sub { font-size: 11px; letter-spacing: 2px; color: #999; text-transform: uppercase; margin-top: 4px; }
-  .info-row { display: flex; gap: 32px; margin-bottom: 32px; flex-wrap: wrap; }
+  .info-row { display: flex; gap: 32px; margin-bottom: 32px; flex-wrap: nowrap; }
   .info-block { min-width: 120px; }
   .info-label { font-size: 10px; letter-spacing: 1.5px; color: #999; text-transform: uppercase; margin-bottom: 4px; }
   .info-value { font-size: 15px; font-weight: 600; color: #1a1a1a; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
   thead tr { border-bottom: 2px solid #1a1a1a; }
   th { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #666; padding: 10px 8px; text-align: left; font-weight: 600; }
-  td { padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: top; }
+  td { padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: top; word-wrap: break-word; }
   .totals { margin-top: 24px; margin-left: auto; width: 260px; }
   .total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #444; }
   .total-final { display: flex; justify-content: space-between; border-top: 2px solid #a62932; padding-top: 12px; margin-top: 8px; font-size: 18px; font-weight: 700; color: #a62932; }
