@@ -6,7 +6,7 @@
  * Liderlik tablosu Apple Game Center üzerinden.
  */
 
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -28,7 +28,11 @@ import Constants from 'expo-constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { SPACING, API_BASE_URL } from '../lib/constants';
-import { useGameCenter } from 'expo-game-center';
+import { GameCenterService } from 'expo-game-center';
+// NOT: useGameCenter hook'u KULLANILMIYOR.
+// Hook içinde `...config` spread her render'da yeni obje üretiyor →
+// getService her render değişiyor → useEffect her render çalışıyor →
+// ChromaDashScreen 60fps render'da sonsuz döngü. GameCenterService direkt.
 
 // ─── Game Center Config ───────────────────────────────────────────────────────
 
@@ -196,46 +200,89 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const footerH = insets.bottom + 48;
     const playH = Math.max(200, SH - headerH - footerH);
 
-    // ── Game Center ───────────────────────────────────────────────────────────
-    // CRITICAL: Options objesini useMemo ile sabitliyoruz.
-    // Aksi takdirde her render'da yeni obje → hook içinde getService
-    // her render'da değişir → useEffect sürekli çalışır → sonsuz döngü.
-    const gcOptions = useMemo(() => ({
-        leaderboards: { highscore: GC_LEADERBOARD_ID },
-        autoInitialize: true,
-        autoAuthenticate: false, // Manuel yönetiyoruz (library'nin koşulu güvenilmez)
-    }), []); // boş deps: bir kez oluştur, asla değişme
+    // ── Game Center (direkt GameCenterService — hook yok, döngü yok) ──────────
+    // useGameCenter hook'u her render'da options'ı spread ederek yeni "config"
+    // objesi üretiyor. Bu obje getService'in bağımlılığı, o da useEffect'in
+    // bağımlılığı. ChromaDashScreen saniyede 60 kez render olduğunda:
+    //   yeni config → yeni getService → useEffect → setStatus → render → ∞
+    // Çözüm: GameCenterService'i doğrudan ref ile tutup state'i kendimiz yönetiyoruz.
+    // useEffect boş bağımlılıkla YALNIZCA mount'ta çalışır → döngü imkansız.
 
-    const gc = useGameCenter(gcOptions);
+    const gcServiceRef = useRef<InstanceType<typeof GameCenterService> | null>(null);
+    if (!gcServiceRef.current && Platform.OS === 'ios') {
+        gcServiceRef.current = new GameCenterService({
+            leaderboards: { highscore: GC_LEADERBOARD_ID },
+        });
+    }
 
-    // gc'yi bir ref'e sakla: die/submitScoreToBackend gc'ye doğrudan
-    // bağımlı olmasın, yoksa gameLoop her GC state değişiminde yeniden
-    // oluşur ve RAF kaybolur.
-    const gcRef = useRef(gc);
-    gcRef.current = gc;
+    const [gcState, setGcState] = useState<{
+        state: string;
+        isAuthenticated: boolean;
+        player: { playerID?: string; displayName?: string; alias?: string } | null;
+        isLoading: boolean;
+    }>({ state: 'uninitialized', isAuthenticated: false, player: null, isLoading: true });
 
-    // Kullanıcı GC'ye bağlı değilse sonsuz retry döngüsünü önler.
-    // Tek seferlik deneme: başarılı olursa gc.isReady=true, olmadıysa
-    // kullanıcı badge'e manuel tıklayabilir.
-    const gcAuthAttemptedRef = useRef(false);
+    // gcState'i ref'e de sakla — die/submitScoreToBackend stale closure olmadan okusun
+    const gcStateRef = useRef(gcState);
+    gcStateRef.current = gcState;
 
-    // ── GC Authentication: init bittikten sonra manuel tetikle ───────────────
+    // ── GC init: mount'ta BİR KEZ — boş deps → sonsuz döngü yok ─────────────
     useEffect(() => {
-        // Daha önce denendi mi? Başarılıysa zaten isReady=true olmuştur.
-        if (gcAuthAttemptedRef.current) return;
-        // 'not_authenticated' veya 'initialized' durumuna geçince authenticate et
-        if (
-            gc.isPlatformSupported &&
-            !gc.isLoading &&
-            !gc.isReady &&
-            gc.status.state !== 'authenticating' &&
-            gc.status.state !== 'uninitialized'
-        ) {
-            gcAuthAttemptedRef.current = true;
-            gc.authenticate().catch(() => { /* sessiz */ });
+        const svc = gcServiceRef.current;
+        if (!svc) {
+            setGcState(prev => ({ ...prev, isLoading: false }));
+            return;
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gc.status.state, gc.isLoading]); // gc.authenticate sabit (useMemo koruyor)
+        // Servis durum değişikliklerini React state'e yansıt
+        const removeListener = svc.addStatusListener((s: any) => {
+            setGcState(prev => ({
+                ...prev,
+                state: s.state,
+                isAuthenticated: s.isAuthenticated,
+                player: s.player,
+            }));
+        });
+        // initialize → authenticate (tek zincir)
+        svc.initialize()
+            .then(() => svc.authenticate())
+            .catch(() => {})
+            .finally(() => {
+                const s = svc.getStatus();
+                setGcState({
+                    state: s.state,
+                    isAuthenticated: s.isAuthenticated,
+                    player: s.player,
+                    isLoading: false,
+                });
+            });
+        return removeListener;
+    }, []); // ← boş deps: sadece mount'ta çalışır
+
+    // Computed GC değerleri
+    const gcIsReady = gcState.state === 'authenticated' && gcState.isAuthenticated;
+    const gcPlayerName = gcState.player?.displayName ?? gcState.player?.alias ?? null;
+
+    // Stable GC actions (serviceRef değişmediği için bağımlılık yok)
+    const gcAuthenticate = useCallback(() => {
+        const svc = gcServiceRef.current;
+        if (!svc) return Promise.resolve(false);
+        setGcState(prev => ({ ...prev, isLoading: true }));
+        return svc.authenticate()
+            .then((success: boolean) => {
+                const s = svc.getStatus();
+                setGcState({ state: s.state, isAuthenticated: s.isAuthenticated, player: s.player, isLoading: false });
+                return success;
+            })
+            .catch(() => {
+                setGcState(prev => ({ ...prev, isLoading: false }));
+                return false;
+            });
+    }, []);
+
+    const gcShowLeaderboard = useCallback(() => {
+        return gcServiceRef.current?.showLeaderboard('highscore') ?? Promise.resolve();
+    }, []);
+
 
     // Temel UI state
     const [, setTick] = useState(0);
@@ -280,16 +327,16 @@ export default function ChromaDashScreen({ navigation }: Props) {
     }, []);
 
     // ── Skor gönderme (Game Center + Backend bildirim amaçlı) ─────────────────
-    // gcRef.current kullanıyoruz → gc.player'a bağımlı değil → gameLoop stabil
+    // gcStateRef.current kullanıyoruz → bağımlılık yok → gameLoop stabil
 
     const submitScoreToBackend = useCallback(async (score: number) => {
         if (score <= 0) return;
         try {
             const pushToken = await getPushToken();
-            const currentGC = gcRef.current;
+            const p = gcStateRef.current.player;
             const body: Record<string, unknown> = {
-                gcPlayerId: currentGC.player?.playerID ?? 'unknown',
-                displayName: currentGC.player?.displayName ?? currentGC.player?.alias ?? 'Anonim',
+                gcPlayerId: p?.playerID ?? 'unknown',
+                displayName: p?.displayName ?? p?.alias ?? 'Anonim',
                 score,
             };
             if (pushToken) body.pushToken = pushToken;
@@ -300,7 +347,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                 body: JSON.stringify(body),
             });
         } catch { /* sessiz — bildirim göndermek kritik değil */ }
-    }, [getPushToken]); // gcRef.current → bağımlılığa gerek yok
+    }, [getPushToken]); // gcStateRef.current → bağımlılığa gerek yok
 
     // ── İlk yükleme ───────────────────────────────────────────────────────────
 
@@ -403,9 +450,9 @@ export default function ChromaDashScreen({ navigation }: Props) {
         await SecureStore.setItemAsync(LB_KEY, JSON.stringify(newLB)).catch(() => { });
         setLeaderboard(newLB);
 
-        // Game Center'a skor gönder (gcRef.current → gc'ye bağımlı değil)
-        if (gs.score > 0 && gcRef.current.isReady) {
-            gcRef.current.submitScore(gs.score, 'highscore').catch(() => { });
+        // Game Center'a skor gönder
+        if (gs.score > 0 && gcStateRef.current.state === 'authenticated' && gcStateRef.current.isAuthenticated) {
+            gcServiceRef.current?.submitScore(gs.score, 'highscore').catch(() => { });
         }
 
         // Backend'e bildirim amaçlı skor gönder
@@ -545,8 +592,6 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const progress = rankProgress(gs.score);
     const hiScore = leaderboard[0]?.score ?? 0;
 
-    const gcPlayerName = gc.player?.displayName ?? gc.player?.alias ?? null;
-
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
@@ -633,11 +678,11 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 <Text style={s.tagline}>alpgraphics · Renk Algı Yarışması</Text>
 
                                 {/* Game Center durumu */}
-                                {gc.isReady && gcPlayerName ? (
+                                {gcIsReady && gcPlayerName ? (
                                     <View style={[s.gcBadge, { borderColor: '#39ff6a55' }]}>
                                         <Text style={s.gcBadgeTxt}>🎮 {gcPlayerName}</Text>
                                     </View>
-                                ) : gc.isLoading ? (
+                                ) : gcState.isLoading ? (
                                     <View style={[s.gcBadge, { borderColor: 'rgba(255,255,255,0.1)' }]}>
                                         <ActivityIndicator size="small" color="rgba(255,255,255,0.3)" />
                                         <Text style={[s.gcBadgeTxt, { color: 'rgba(255,255,255,0.3)' }]}>  Game Center bağlanıyor…</Text>
@@ -645,7 +690,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 ) : (
                                     <TouchableOpacity
                                         style={[s.gcBadge, { borderColor: '#ff2d7855' }]}
-                                        onPress={() => gc.authenticate().catch(() => { })}
+                                        onPress={() => gcAuthenticate()}
                                     >
                                         <Text style={[s.gcBadgeTxt, { color: '#ff2d78' }]}>⚠️ Game Center'a bağlan</Text>
                                     </TouchableOpacity>
@@ -673,13 +718,13 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 <TouchableOpacity
                                     style={[s.card, { borderColor: 'rgba(0,229,255,0.25)' }]}
                                     onPress={() => {
-                                        if (gc.isReady) {
-                                            gc.showLeaderboard('highscore').catch(() => {
+                                        if (gcIsReady) {
+                                            gcShowLeaderboard().catch(() => {
                                                 Alert.alert('Hata', 'Liderlik tablosu açılamadı.');
                                             });
                                         } else {
                                             Alert.alert('Game Center', 'Liderlik tablosunu görmek için Game Center\'a bağlanman gerekiyor.', [
-                                                { text: 'Bağlan', onPress: () => gc.authenticate().catch(() => { }) },
+                                                { text: 'Bağlan', onPress: () => gcAuthenticate() },
                                                 { text: 'İptal', style: 'cancel' },
                                             ]);
                                         }
@@ -826,10 +871,10 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 <TouchableOpacity
                                     style={[s.card, { borderColor: 'rgba(0,229,255,0.25)' }]}
                                     onPress={() => {
-                                        if (gc.isReady) {
-                                            gc.showLeaderboard('highscore').catch(() => { });
+                                        if (gcIsReady) {
+                                            gcShowLeaderboard().catch(() => { });
                                         } else {
-                                            gc.authenticate().catch(() => { });
+                                            gcAuthenticate();
                                         }
                                     }}
                                     activeOpacity={0.7}
@@ -845,7 +890,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
                                 </TouchableOpacity>
 
                                 {/* Game Center skor durumu */}
-                                {gc.isReady && (
+                                {gcIsReady && (
                                     <View style={[s.gcBadge, { borderColor: '#39ff6a55', marginBottom: 12 }]}>
                                         <Text style={s.gcBadgeTxt}>✅ Skor Game Center'a kaydedildi</Text>
                                     </View>
