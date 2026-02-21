@@ -80,7 +80,8 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
             // Load immediately
             loadMessages();
 
-            // Set up polling
+            // Set up polling — clear any existing interval first to prevent stacking
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = setInterval(() => {
                 loadMessages();
             }, 5000);
@@ -125,6 +126,7 @@ export default function ChatScreen({ navigation, route }: ChatScreenProps) {
 
     const formatMessageTime = (dateStr: string): string => {
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '--:--';
         return date.toLocaleTimeString('tr-TR', {
             hour: '2-digit',
             minute: '2-digit',

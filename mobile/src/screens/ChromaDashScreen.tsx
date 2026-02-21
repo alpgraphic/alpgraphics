@@ -139,7 +139,7 @@ function rankProgress(score: number): number {
     const cur = getRank(score);
     const next = getNextRank(score);
     if (!next) return 1;
-    return Math.min(1, (score - cur.min) / (next.min - cur.min));
+    return Math.max(0, Math.min(1, (score - cur.min) / (next.min - cur.min)));
 }
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -297,6 +297,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
     const [isNewRecord, setIsNewRecord] = useState(false);
 
     // Refs
+    const mountedRef = useRef(true);  // guard setState calls in async die()
     const rafRef = useRef<number | null>(null);
     const cdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const scoreTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -367,6 +368,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
     // ── Temizlik ──────────────────────────────────────────────────────────────
 
     useEffect(() => () => {
+        mountedRef.current = false;
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         if (cdTimerRef.current) clearInterval(cdTimerRef.current);
         if (scoreTimerRef.current) clearInterval(scoreTimerRef.current);
@@ -415,6 +417,9 @@ export default function ChromaDashScreen({ navigation }: Props) {
             totalOrbs: prevStats.totalOrbs + gs.orbsCollected,
         };
         await SecureStore.setItemAsync(STATS_KEY, JSON.stringify(newStats)).catch(() => { });
+        // Component may have unmounted while we were in SecureStore (user navigated away).
+        // Stats are already persisted above — safe to bail on UI updates.
+        if (!mountedRef.current) return;
         setStats(newStats);
 
         // Kupa kontrolü

@@ -277,7 +277,7 @@ export default function AdminProposalsScreen({ navigation }: Props) {
             ...prev,
             items: [
                 ...prev.items,
-                { id: Date.now(), description: '', quantity: 1, unitPrice: 0, total: 0 },
+                { id: Date.now() + Math.random(), description: '', quantity: 1, unitPrice: 0, total: 0 },
             ],
         }));
     };
