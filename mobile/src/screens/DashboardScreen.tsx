@@ -181,7 +181,12 @@ export default function DashboardScreen({ navigation }: Props) {
                     <View style={styles.sectionContainer}>
                         <Text style={styles.sectionTitle}>Projelerim</Text>
                         {projects.map(project => (
-                            <View key={project.id} style={styles.projectCard}>
+                            <TouchableOpacity
+                                key={project.id}
+                                style={styles.projectCard}
+                                activeOpacity={0.8}
+                                onPress={() => navigation.navigate('ProjectMilestones', { projectId: project.id, projectTitle: project.title })}
+                            >
                                 <View style={styles.projectInfo}>
                                     <Text style={styles.projectTitle}>{project.title}</Text>
                                     <Text style={styles.projectCategory}>{project.category}</Text>
@@ -194,7 +199,8 @@ export default function DashboardScreen({ navigation }: Props) {
                                         <Text style={styles.progressText}>{project.progress}%</Text>
                                     </View>
                                 )}
-                            </View>
+                                <Text style={styles.milestonesLink}>Süreci Takip Et →</Text>
+                            </TouchableOpacity>
                         ))}
                     </View>
                 )}
@@ -633,6 +639,13 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '600' as const,
         color: COLORS.textMuted,
+    },
+    milestonesLink: {
+        fontSize: 12,
+        fontWeight: '600' as const,
+        color: COLORS.primary,
+        marginTop: SPACING.sm,
+        textAlign: 'right',
     },
     // Transaction
     transactionRow: {

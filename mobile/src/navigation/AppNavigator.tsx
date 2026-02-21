@@ -19,6 +19,7 @@ import PlannerScreen from '../screens/PlannerScreen';
 import BriefFormScreen from '../screens/BriefFormScreen';
 import GameScreen from '../screens/GameScreen';
 import ChromaDashScreen from '../screens/ChromaDashScreen';
+import ProjectMilestonesScreen from '../screens/ProjectMilestonesScreen';
 
 import { isAuthenticated, getUserData, setSessionExpiredHandler, logout } from '../lib/auth';
 import { COLORS } from '../lib/constants';
@@ -40,6 +41,7 @@ export type RootStackParamList = {
     BriefForm: { briefId?: string; isReadOnly?: boolean } | undefined;
     Game: undefined;
     ChromaDash: undefined;
+    ProjectMilestones: { projectId: string; projectTitle: string };
 };
 
 type Props = {
@@ -171,6 +173,13 @@ export default function AppNavigator({ onAuthenticated }: Props) {
                     name="ChromaDash"
                     component={ChromaDashScreen}
                     options={{ animation: 'slide_from_bottom' }}
+                />
+
+                {/* Client Milestone View */}
+                <Stack.Screen
+                    name="ProjectMilestones"
+                    component={ProjectMilestonesScreen}
+                    options={{ animation: 'slide_from_right' }}
                 />
 
                 {/* Shared Screens */}

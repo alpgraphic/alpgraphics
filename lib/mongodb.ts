@@ -359,6 +359,32 @@ export async function getGameScoresCollection(): Promise<Collection<DbGameScore>
     return db.collection<DbGameScore>('game_scores');
 }
 
+// ─── Milestones ───────────────────────────────────────────────────────────────
+export interface DbMilestoneAttachment {
+    id: string;
+    imageData: string;   // base64 encoded (compressed on client before upload)
+    mimeType: string;
+}
+
+export interface DbMilestone {
+    _id?: any;
+    projectId: string;
+    accountId?: string;  // linked account to push-notify (from project.linkedAccountId)
+    title: string;
+    description?: string;
+    status: 'pending' | 'completed';
+    order: number;
+    attachments: DbMilestoneAttachment[];
+    feedback: Record<string, 'liked' | 'disliked'>;  // attachmentId → 'liked'|'disliked'
+    completedAt?: Date;
+    createdAt: Date;
+}
+
+export async function getMilestonesCollection(): Promise<Collection<DbMilestone>> {
+    const db = await getDb();
+    return db.collection<DbMilestone>('milestones');
+}
+
 // Run index creation on module load (server-side only)
 if (typeof window === 'undefined') {
     ensureIndexes().catch(console.error);

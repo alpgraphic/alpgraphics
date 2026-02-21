@@ -56,6 +56,12 @@
       ],
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Milestone görselleri seçmek için galeri erişimi gereklidir"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
