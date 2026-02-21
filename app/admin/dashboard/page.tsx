@@ -11,6 +11,7 @@ import SceneSettings from "@/components/admin/SceneSettings";
 import SEOSettings from "@/components/admin/SEOSettings";
 import CacheManager from "@/components/admin/CacheManager";
 // AIBrandGenerator removed - replaced with Brand Pages system
+import { briefTemplates } from "@/lib/briefTypes";
 
 export default function AdminDashboard() {
     const { projects, addProject, deleteProject, invoices, addInvoice, expenses, addExpense, removeExpense, messages, markMessageRead, accounts, addAccount, updateAccount, deleteAccount, addTransaction, proposals, addProposal, updateProposal, deleteProposal, isAdminNight, toggleAdminTheme } = useAgency();
@@ -26,6 +27,13 @@ export default function AdminDashboard() {
         if (!auth || auth !== 'admin') router.push('/login');
     }, [router]);
 
+
+    // Toast notification
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     // Modal States
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -67,6 +75,9 @@ export default function AdminDashboard() {
     const [milestones, setMilestones] = useState<any[]>([]);
     const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
     const [milestonesLoading, setMilestonesLoading] = useState(false);
+
+    // Brief Response Viewer
+    const [viewBriefAccount, setViewBriefAccount] = useState<any | null>(null);
 
     // Brief Assignment States
     const [selectedBriefAccountId, setSelectedBriefAccountId] = useState<number | string | null>(null);
@@ -254,7 +265,7 @@ export default function AdminDashboard() {
 
             if (!res.ok) {
                 const data = await res.json();
-                alert('Hata: ' + (data.error || 'Kimlik bilgileri güncellenemedi.'));
+                showToast(data.error || 'Kimlik bilgileri güncellenemedi.', 'error');
                 setEditCredLoading(false);
                 return;
             }
@@ -273,9 +284,9 @@ export default function AdminDashboard() {
             setEditCredAccountId(null);
             setEditCredUsername('');
             setEditCredPassword('');
-            alert('Kimlik bilgileri güncellendi ✓');
+            showToast('Kimlik bilgileri güncellendi');
         } catch (e) {
-            alert('Hata oluştu');
+            showToast('Hata oluştu', 'error');
         } finally {
             setEditCredLoading(false);
         }
@@ -1247,9 +1258,9 @@ export default function AdminDashboard() {
                                                         briefStatus: 'pending'
                                                     });
                                                     setSelectedBriefAccountId(null);
-                                                    alert('Form başarıyla atandı!');
+                                                    showToast('Form başarıyla atandı!');
                                                 } else {
-                                                    alert('Lütfen bir müşteri seçin');
+                                                    showToast('Lütfen bir müşteri seçin', 'error');
                                                 }
                                             }}
                                             disabled={!selectedBriefAccountId}
@@ -1295,13 +1306,7 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div className="flex gap-3">
                                                     <button
-                                                        onClick={() => {
-                                                            // Show brief responses in alert (for demo)
-                                                            const responses = acc.briefResponses;
-                                                            if (responses) {
-                                                                alert('Brief Cevapları:\n\n' + Object.entries(responses).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n'));
-                                                            }
-                                                        }}
+                                                        onClick={() => setViewBriefAccount(acc)}
                                                         className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${isAdminNight ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'}`}
                                                     >
                                                         Görüntüle
@@ -1808,10 +1813,11 @@ export default function AdminDashboard() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Şifre (opsiyonel — müşteri girişi şifresiz)</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Şifre</label>
                                         <input
                                             type="text"
-                                            placeholder="Boş bırakılabilir"
+                                            required
+                                            placeholder="Müşteri giriş şifresi"
                                             value={newAccountPassword}
                                             onChange={e => setNewAccountPassword(e.target.value)}
                                             className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
@@ -2617,6 +2623,65 @@ export default function AdminDashboard() {
                         </motion.div>
                     </div>
                 )}
+
+            {/* Brief Response Viewer Modal */}
+            {viewBriefAccount && (
+                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50" onClick={() => setViewBriefAccount(null)}>
+                    <div
+                        className={`w-full md:max-w-2xl max-h-[85vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-6 ${isAdminNight ? 'bg-[#111]' : 'bg-white'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="w-10 h-1 rounded-full bg-current/20 mx-auto mb-5 md:hidden" />
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 className="text-lg font-bold">{viewBriefAccount.company}</h2>
+                                <p className="text-xs opacity-40 mt-0.5">{viewBriefAccount.name} · {viewBriefAccount.briefFormType || 'Brief'}</p>
+                            </div>
+                            <button onClick={() => setViewBriefAccount(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm opacity-40 hover:opacity-100 hover:bg-current/10">✕</button>
+                        </div>
+
+                        {viewBriefAccount.briefResponses && Object.keys(viewBriefAccount.briefResponses).length > 0 ? (() => {
+                            const template = briefTemplates.find(t => t.id === viewBriefAccount.briefFormType);
+                            const questions = template?.questions || [];
+                            const responses = viewBriefAccount.briefResponses as Record<string, string | string[]>;
+                            return (
+                                <div className="space-y-3">
+                                    {Object.entries(responses).map(([key, value]) => {
+                                        const question = questions.find(q => q.id === key);
+                                        const label = question?.question || key.replace(/_/g, ' ');
+                                        const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                                        if (!displayValue) return null;
+                                        return (
+                                            <div key={key} className={`p-4 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1.5">{label}</p>
+                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayValue}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })() : (
+                            <div className="text-center py-12 opacity-40">
+                                <p className="text-4xl mb-3">📭</p>
+                                <p className="text-sm">Henüz cevap yok</p>
+                            </div>
+                        )}
+
+                        {viewBriefAccount.briefSubmittedAt && (
+                            <p className="text-xs opacity-30 text-center mt-6">
+                                Gönderim: {new Date(viewBriefAccount.briefSubmittedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                    {toast.message}
+                </div>
+            )}
 
             </AnimatePresence >
         </div >

@@ -26,6 +26,8 @@ interface Brief {
     type: string;
     status: 'none' | 'pending' | 'submitted' | 'approved';
     submittedAt?: string;
+    briefFormType?: string;
+    responses?: Record<string, string | string[]>;
 }
 
 export default function AdminBriefsScreen({ navigation }: Props) {
@@ -50,6 +52,8 @@ export default function AdminBriefsScreen({ navigation }: Props) {
                         type: acc.briefFormType || 'Genel',
                         status: acc.briefStatus,
                         submittedAt: acc.briefSubmittedAt,
+                        briefFormType: acc.briefFormType,
+                        responses: acc.briefResponses || undefined,
                     }));
                 setBriefs(briefsList);
             }
@@ -306,11 +310,26 @@ export default function AdminBriefsScreen({ navigation }: Props) {
                                     </View>
                                 )}
 
-                                <View style={[styles.detailSection, { borderBottomWidth: 0 }]}>
-                                    <Text style={styles.noteText}>
-                                        Brief detayları web panelinden görüntülenebilir
-                                    </Text>
-                                </View>
+                                {/* Brief Responses */}
+                                {selectedBrief.responses && Object.keys(selectedBrief.responses).length > 0 ? (
+                                    <View style={{ marginTop: SPACING.sm }}>
+                                        <Text style={[styles.detailLabel, { marginBottom: SPACING.md }]}>CEVAPLAR</Text>
+                                        {Object.entries(selectedBrief.responses).map(([key, value]) => {
+                                            const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                                            if (!displayValue) return null;
+                                            return (
+                                                <View key={key} style={styles.responseItem}>
+                                                    <Text style={styles.responseKey}>{key.replace(/_/g, ' ').toUpperCase()}</Text>
+                                                    <Text style={styles.responseValue}>{displayValue}</Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                ) : (
+                                    <View style={[styles.detailSection, { borderBottomWidth: 0 }]}>
+                                        <Text style={styles.noteText}>Henüz cevap gönderilmedi</Text>
+                                    </View>
+                                )}
 
                                 <TouchableOpacity
                                     style={styles.closeBtn}
@@ -539,6 +558,24 @@ const styles = StyleSheet.create({
         fontSize: FONTS.sm,
         color: COLORS.textSecondary,
         fontStyle: 'italic',
+    },
+    responseItem: {
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.md,
+        padding: SPACING.md,
+        marginBottom: SPACING.sm,
+    },
+    responseKey: {
+        fontSize: FONTS.xs,
+        fontWeight: '700' as any,
+        color: COLORS.textMuted,
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    responseValue: {
+        fontSize: FONTS.sm,
+        color: COLORS.text,
+        lineHeight: 20,
     },
     closeBtn: {
         marginTop: SPACING.lg,

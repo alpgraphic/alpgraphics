@@ -46,6 +46,9 @@ export async function GET(request: NextRequest) {
                     totalPaid: acc.totalPaid || 0,
                     briefStatus: acc.briefStatus,
                     briefFormType: acc.briefFormType,
+                    briefResponses: acc.briefResponses || null,
+                    briefSubmittedAt: acc.briefSubmittedAt || null,
+                    briefApprovedAt: acc.briefApprovedAt || null,
                     createdAt: acc.createdAt,
                 })),
             });
@@ -200,7 +203,7 @@ export async function POST(request: NextRequest) {
 
         const emailStr = email ? String(email).toLowerCase().trim() : `${usernameStr}@alpgraphics.local`;
 
-        // Password optional for clients (passwordless)
+        // Validate password strength if provided
         if (password) {
             const passwordValidation = validatePassword(password);
             if (!passwordValidation.valid) {

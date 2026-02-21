@@ -23,7 +23,7 @@ interface TokenResponse {
 // Generic error to prevent user enumeration
 const INVALID_CREDENTIALS_MSG = 'Kullanıcı adı veya şifre hatalı';
 
-// POST /api/mobile/auth - Login (username-based, client passwordless)
+// POST /api/mobile/auth - Login (username-based, password required)
 export async function POST(request: NextRequest): Promise<NextResponse<TokenResponse>> {
     try {
         const ip = getClientIP(request);

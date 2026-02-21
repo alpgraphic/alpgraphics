@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Password optional for clients (passwordless login)
+        // Validate password strength if provided
         if (password) {
             const passwordValidation = validatePassword(password, email || usernameStr);
             if (!passwordValidation.valid) {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Hash password if provided (clients are passwordless by default)
+        // Hash password if provided
         const passwordHash = password ? await bcrypt.hash(password, 12) : undefined;
 
         // Generate brief token for client brief form access

@@ -16,6 +16,14 @@ export default function ClientBriefsPage() {
         if (!auth || auth !== 'admin') router.push('/login');
     }, [router]);
 
+    // Toast & Brief viewer
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+    const [viewBriefAccount, setViewBriefAccount] = useState<any | null>(null);
+
     // States
     const [selectedAccountId, setSelectedAccountId] = useState<number | string>('');
     const [selectedFormType, setSelectedFormType] = useState<string>('');
@@ -38,7 +46,7 @@ export default function ClientBriefsPage() {
 
     const handleAssignBrief = async () => {
         if (!selectedAccountId || !selectedFormType) {
-            alert('Lütfen müşteri ve form tipi seçin');
+            showToast('Lütfen müşteri ve form tipi seçin', 'error');
             return;
         }
 
@@ -58,14 +66,14 @@ export default function ClientBriefsPage() {
             // Brief form URL generated for the client
             const briefUrl = `${window.location.origin}/brief/${briefToken}`;
 
-            alert(`✅ Brief formu ${selectedAccount?.company || 'müşteri'} için atandı!`);
+            showToast(`Brief formu ${selectedAccount?.company || 'müşteri'} için atandı!`);
 
             // Reset
             setSelectedAccountId('');
             setSelectedFormType('');
         } catch (error) {
             console.error('❌ Brief assignment error:', error);
-            alert('❌ Brief ataması başarısız');
+            showToast('Brief ataması başarısız', 'error');
         } finally {
             setIsAssigning(false);
         }
@@ -252,20 +260,7 @@ export default function ClientBriefsPage() {
                                                     </p>
                                                 </div>
                                                 <button
-                                                    onClick={() => {
-                                                        // Show brief responses
-                                                        if (account.briefResponses) {
-                                                            const responses = Object.entries(account.briefResponses)
-                                                                .map(([key, value]) => {
-                                                                    const val = Array.isArray(value) ? value.join(', ') : value;
-                                                                    return `${key}: ${val}`;
-                                                                })
-                                                                .join('\n\n');
-                                                            alert(`Brief Cevapları:\n\n${responses}`);
-                                                        } else {
-                                                            alert('Henüz cevap yok');
-                                                        }
-                                                    }}
+                                                    onClick={() => setViewBriefAccount(account)}
                                                     className="px-4 py-2 bg-[#a62932] text-white text-xs font-bold rounded-lg hover:bg-[#c4323d] transition-colors"
                                                 >
                                                     İncele →
@@ -279,6 +274,65 @@ export default function ClientBriefsPage() {
                     )}
                 </section>
             </main>
+
+            {/* Brief Response Viewer Modal */}
+            {viewBriefAccount && (
+                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50" onClick={() => setViewBriefAccount(null)}>
+                    <div
+                        className={`w-full md:max-w-2xl max-h-[85vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-6 ${isAdminNight ? 'bg-[#111]' : 'bg-white'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="w-10 h-1 rounded-full bg-current/20 mx-auto mb-5 md:hidden" />
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 className="text-lg font-bold">{viewBriefAccount.company}</h2>
+                                <p className="text-xs opacity-40 mt-0.5">{viewBriefAccount.name} · {viewBriefAccount.briefFormType || 'Brief'}</p>
+                            </div>
+                            <button onClick={() => setViewBriefAccount(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm opacity-40 hover:opacity-100 hover:bg-current/10">✕</button>
+                        </div>
+
+                        {viewBriefAccount.briefResponses && Object.keys(viewBriefAccount.briefResponses).length > 0 ? (() => {
+                            const template = briefTemplates.find(t => t.id === viewBriefAccount.briefFormType);
+                            const questions = template?.questions || [];
+                            const responses = viewBriefAccount.briefResponses as Record<string, string | string[]>;
+                            return (
+                                <div className="space-y-3">
+                                    {Object.entries(responses).map(([key, value]) => {
+                                        const question = questions.find(q => q.id === key);
+                                        const label = question?.question || key.replace(/_/g, ' ');
+                                        const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                                        if (!displayValue) return null;
+                                        return (
+                                            <div key={key} className={`p-4 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1.5">{label}</p>
+                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayValue}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })() : (
+                            <div className="text-center py-12 opacity-40">
+                                <p className="text-4xl mb-3">📭</p>
+                                <p className="text-sm">Henüz cevap yok</p>
+                            </div>
+                        )}
+
+                        {viewBriefAccount.briefSubmittedAt && (
+                            <p className="text-xs opacity-30 text-center mt-6">
+                                Gönderim: {new Date(viewBriefAccount.briefSubmittedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Toast */}
+            {toast && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                    {toast.message}
+                </div>
+            )}
         </div>
     );
 }

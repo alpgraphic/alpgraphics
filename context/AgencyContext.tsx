@@ -249,7 +249,7 @@ export interface Account {
     company: string; // Company Name
     email: string;
     username?: string; // Unique login identifier
-    password?: string; // Client panel login password (optional — clients are passwordless)
+    password?: string; // Client panel login password
     totalDebt: number; // Toplam Borçlanılan
     totalPaid: number; // Toplam Ödenen
     balance: number;   // Bakiye (Debt - Paid)
