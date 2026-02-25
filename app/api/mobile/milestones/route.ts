@@ -198,48 +198,54 @@ export async function PUT(request: NextRequest) {
             { projection: { accountId: 1, title: 1, projectId: 1 } }
         );
 
-        // Send push notification to linked client
-        if (milestone?.accountId) {
-            try {
-                const tokens = await getTokensForUser(milestone.accountId);
-                if (tokens.length > 0) {
-                    const hasPhotos = validAttachments.length > 0;
-                    await sendPushNotification(tokens, {
-                        title: '📋 Proje Güncellendi',
-                        body: hasPhotos
-                            ? `${milestone.title} — ${validAttachments.length} yeni görsel eklendi`
-                            : milestone.title,
-                        data: {
-                            type: 'milestone',
-                            milestoneId: id,
-                            projectId: milestone.projectId,
-                        },
-                    });
+        // Return response immediately
+        const response = NextResponse.json({ success: true });
+
+        // Fire-and-forget: push notification + progress update
+        (async () => {
+            // Push notification to client
+            if (milestone?.accountId) {
+                try {
+                    const tokens = await getTokensForUser(milestone.accountId);
+                    if (tokens.length > 0) {
+                        const hasPhotos = validAttachments.length > 0;
+                        await sendPushNotification(tokens, {
+                            title: '📋 Proje Güncellendi',
+                            body: hasPhotos
+                                ? `${milestone.title} — ${validAttachments.length} yeni görsel eklendi`
+                                : milestone.title,
+                            data: {
+                                type: 'milestone',
+                                milestoneId: id,
+                                projectId: milestone.projectId,
+                            },
+                        });
+                    }
+                } catch (notifErr) {
+                    console.error('Milestone push notification error:', notifErr);
                 }
-            } catch (notifErr) {
-                console.error('Milestone push notification error:', notifErr);
             }
-        }
 
-        // Also update project progress (completed / total milestones)
-        try {
-            const all = await col.find({ projectId: milestone?.projectId }).toArray();
-            const completed = all.filter(m => m.status === 'completed').length;
-            const total = all.length;
-            const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+            // Update project progress
+            try {
+                const all = await col.find({ projectId: milestone?.projectId }).toArray();
+                const completed = all.filter(m => m.status === 'completed').length;
+                const total = all.length;
+                const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-            const projects = await getProjectsCollection();
-            if (milestone?.projectId && ObjectId.isValid(milestone.projectId)) {
-                await projects.updateOne(
-                    { _id: new ObjectId(milestone.projectId) } as any,
-                    { $set: { progress, updatedAt: now } }
-                );
+                const projects = await getProjectsCollection();
+                if (milestone?.projectId && ObjectId.isValid(milestone.projectId)) {
+                    await projects.updateOne(
+                        { _id: new ObjectId(milestone.projectId) } as any,
+                        { $set: { progress, updatedAt: now } }
+                    );
+                }
+            } catch (progressErr) {
+                console.error('Progress update error:', progressErr);
             }
-        } catch (progressErr) {
-            console.error('Progress update error:', progressErr);
-        }
+        })();
 
-        return NextResponse.json({ success: true });
+        return response;
     } catch (error) {
         console.error('Milestones PUT error:', error);
         return NextResponse.json({ success: false, error: 'Güncellenemedi' }, { status: 500 });

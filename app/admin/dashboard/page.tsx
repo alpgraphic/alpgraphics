@@ -83,6 +83,10 @@ export default function AdminDashboard() {
     const [milestones, setMilestones] = useState<any[]>([]);
     const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
     const [milestonesLoading, setMilestonesLoading] = useState(false);
+    // Milestone completion with photos
+    const [completingMilestone, setCompletingMilestone] = useState<any>(null);
+    const [milestonePhotos, setMilestonePhotos] = useState<{ id: string; file: File; preview: string; base64: string }[]>([]);
+    const [completingLoading, setCompletingLoading] = useState(false);
 
     // Brief Response Viewer
     const [viewBriefAccount, setViewBriefAccount] = useState<any | null>(null);
@@ -305,7 +309,7 @@ export default function AdminDashboard() {
         try {
             const res = await fetch(`/api/mobile/milestones?projectId=${projectId}`);
             const data = await res.json();
-            if (data.success) setMilestones(data.milestones || []);
+            if (data.success) setMilestones(data.data || []);
         } finally {
             setMilestonesLoading(false);
         }
@@ -322,13 +326,55 @@ export default function AdminDashboard() {
         loadMilestones(projectId);
     };
 
-    const handleCompleteMilestone = async (milestoneId: string, projectId: string) => {
-        await fetch('/api/mobile/milestones', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: milestoneId, attachments: [] }),
-        });
-        loadMilestones(projectId);
+    const openCompleteMilestone = (m: any) => {
+        setCompletingMilestone(m);
+        setMilestonePhotos([]);
+        setCompletingLoading(false);
+    };
+
+    const handleMilestoneFileSelect = async (files: FileList | null) => {
+        if (!files) return;
+        const remaining = 5 - milestonePhotos.length;
+        const selected = Array.from(files).slice(0, remaining);
+        const newPhotos = await Promise.all(selected.map(async (file) => {
+            const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+            return {
+                id: Date.now().toString() + Math.random().toString(36).slice(2),
+                file,
+                preview: URL.createObjectURL(file),
+                base64,
+            };
+        }));
+        setMilestonePhotos(prev => [...prev, ...newPhotos].slice(0, 5));
+    };
+
+    const handleCompleteMilestone = async () => {
+        if (!completingMilestone || !showMilestonesFor) return;
+        setCompletingLoading(true);
+        try {
+            const attachments = milestonePhotos.map(p => ({
+                id: p.id,
+                imageData: p.base64,
+                mimeType: p.file.type || 'image/jpeg',
+            }));
+            await fetch('/api/mobile/milestones', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: completingMilestone.id, attachments }),
+            });
+            setCompletingMilestone(null);
+            setMilestonePhotos([]);
+            loadMilestones(showMilestonesFor.projectId);
+            showToast('Adım tamamlandı — müşteriye bildirim gönderildi');
+        } catch {
+            showToast('Tamamlanamadı', 'error');
+        } finally {
+            setCompletingLoading(false);
+        }
     };
 
     const handleDeleteMilestone = async (milestoneId: string, projectId: string) => {
@@ -2607,7 +2653,7 @@ export default function AdminDashboard() {
                                     <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-0.5">Proje Adımları</p>
                                     <h3 className="text-base font-bold">{showMilestonesFor.projectTitle}</h3>
                                 </div>
-                                <button onClick={() => setShowMilestonesFor(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/5 text-black/40">✕</button>
+                                <button onClick={() => setShowMilestonesFor(null)} className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${isAdminNight ? 'hover:bg-white/10 text-white/40' : 'hover:bg-black/5 text-black/40'}`}>✕</button>
                             </div>
 
                             <div className="p-6 overflow-y-auto flex-1">
@@ -2621,15 +2667,16 @@ export default function AdminDashboard() {
                                 ) : (
                                     <div className="space-y-3 mb-4">
                                         {milestones.map((m: any, i: number) => (
-                                            <div key={m.id} className={`p-4 rounded-xl border flex items-center gap-3 ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/[0.02]'}`}>
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${m.status === 'completed' ? 'bg-green-500/20 text-green-500' : 'bg-black/10 text-black/40'}`}>
+                                            <div key={m.id} className={`p-4 rounded-xl border flex items-start gap-3 ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/[0.02]'}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${m.status === 'completed' ? 'bg-green-500/20 text-green-500' : 'bg-black/10 text-black/40'}`}>
                                                     {m.status === 'completed' ? '✓' : i + 1}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-sm truncate">{m.title}</p>
+                                                    <p className={`font-semibold text-sm ${m.status === 'completed' ? 'line-through opacity-60' : ''}`}>{m.title}</p>
+                                                    {m.description && <p className="text-xs opacity-50 mt-0.5">{m.description}</p>}
                                                     {m.status === 'completed' && (
-                                                        <p className="text-[10px] text-green-500 mt-0.5">
-                                                            Tamamlandı {m.attachments?.length > 0 ? `· ${m.attachments.length} görsel` : ''}
+                                                        <p className="text-[10px] text-green-500 mt-1">
+                                                            ✓ Tamamlandı{m.completedAt && ` · ${new Date(m.completedAt).toLocaleDateString('tr-TR')}`}{m.attachmentCount > 0 ? ` · ${m.attachmentCount} görsel` : ''}
                                                             {m.feedback && Object.keys(m.feedback).length > 0 && ` · 👍${Object.values(m.feedback).filter((f: any) => f === 'liked').length} 👎${Object.values(m.feedback).filter((f: any) => f === 'disliked').length}`}
                                                         </p>
                                                     )}
@@ -2637,7 +2684,7 @@ export default function AdminDashboard() {
                                                 <div className="flex gap-2 flex-shrink-0">
                                                     {m.status === 'pending' && (
                                                         <button
-                                                            onClick={() => handleCompleteMilestone(m.id, showMilestonesFor!.projectId)}
+                                                            onClick={() => openCompleteMilestone(m)}
                                                             className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
                                                         >
                                                             ✓ Tamamla
@@ -2661,7 +2708,7 @@ export default function AdminDashboard() {
                                         value={newMilestoneTitle}
                                         onChange={e => setNewMilestoneTitle(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleAddMilestone(showMilestonesFor!.projectId)}
-                                        className={`flex-1 px-4 py-2.5 rounded-lg border text-sm ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
+                                        className={`flex-1 px-4 py-2.5 rounded-lg border text-sm ${isAdminNight ? 'bg-white/5 border-white/10 text-white placeholder:text-white/30' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
                                     />
                                     <button
                                         onClick={() => handleAddMilestone(showMilestonesFor!.projectId)}
@@ -2676,64 +2723,117 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-            {/* Brief Response Viewer Modal */}
-            {viewBriefAccount && (
-                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50" onClick={() => setViewBriefAccount(null)}>
-                    <div
-                        className={`w-full md:max-w-2xl max-h-[85vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-6 ${isAdminNight ? 'bg-[#111]' : 'bg-white'}`}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div className="w-10 h-1 rounded-full bg-current/20 mx-auto mb-5 md:hidden" />
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h2 className="text-lg font-bold">{viewBriefAccount.company}</h2>
-                                <p className="text-xs opacity-40 mt-0.5">{viewBriefAccount.name} · {viewBriefAccount.briefFormType || 'Brief'}</p>
-                            </div>
-                            <button onClick={() => setViewBriefAccount(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm opacity-40 hover:opacity-100 hover:bg-current/10">✕</button>
-                        </div>
+                {/* Milestone Complete with Photos Modal */}
+                {completingMilestone && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => { setCompletingMilestone(null); setMilestonePhotos([]); }}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            onClick={e => e.stopPropagation()}
+                            className={`rounded-2xl w-full max-w-md p-6 ${isAdminNight ? 'bg-[#0a0a0a] border border-white/10' : 'bg-white'}`}
+                        >
+                            <h3 className="text-lg font-bold mb-1">Adımı Tamamla</h3>
+                            <p className="text-sm opacity-50 mb-4">{completingMilestone.title}</p>
 
-                        {viewBriefAccount.briefResponses && Object.keys(viewBriefAccount.briefResponses).length > 0 ? (() => {
-                            const template = briefTemplates.find(t => t.id === viewBriefAccount.briefFormType);
-                            const questions = template?.questions || [];
-                            const responses = viewBriefAccount.briefResponses as Record<string, string | string[]>;
-                            return (
-                                <div className="space-y-3">
-                                    {Object.entries(responses).map(([key, value]) => {
-                                        const question = questions.find(q => q.id === key);
-                                        const label = question?.question || key.replace(/_/g, ' ');
-                                        const displayValue = Array.isArray(value) ? value.join(', ') : value;
-                                        if (!displayValue) return null;
-                                        return (
-                                            <div key={key} className={`p-4 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1.5">{label}</p>
-                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayValue}</p>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })() : (
-                            <div className="text-center py-12 opacity-40">
-                                <p className="text-4xl mb-3">📭</p>
-                                <p className="text-sm">Henüz cevap yok</p>
-                            </div>
-                        )}
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">GÖRSELLER (İSTEĞE BAĞLI · MAK. 5)</p>
+                            <p className="text-xs opacity-40 mb-3">Görsel eklerseniz müşteri her birine 👍 ya da 👎 geri bildirim verebilir.</p>
 
-                        {viewBriefAccount.briefSubmittedAt && (
-                            <p className="text-xs opacity-30 text-center mt-6">
-                                Gönderim: {new Date(viewBriefAccount.briefSubmittedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                        )}
+                            {/* Photo grid */}
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {milestonePhotos.map(p => (
+                                    <div key={p.id} className="relative w-20 h-20 rounded-lg overflow-hidden group">
+                                        <img src={p.preview} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => { URL.revokeObjectURL(p.preview); setMilestonePhotos(prev => prev.filter(x => x.id !== p.id)); }}
+                                            className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >✕</button>
+                                    </div>
+                                ))}
+                                {milestonePhotos.length < 5 && (
+                                    <label className={`w-20 h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors ${isAdminNight ? 'border-white/20 hover:border-white/40' : 'border-black/20 hover:border-black/40'}`}>
+                                        <span className="text-xl opacity-40">+</span>
+                                        <span className="text-[9px] opacity-40">Görsel</span>
+                                        <input type="file" accept="image/*" multiple className="hidden"
+                                            onChange={e => handleMilestoneFileSelect(e.target.files)} />
+                                    </label>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button onClick={() => { setCompletingMilestone(null); setMilestonePhotos([]); }}
+                                    className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors ${isAdminNight ? 'bg-white/10 hover:bg-white/15' : 'bg-black/5 hover:bg-black/10'}`}>
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleCompleteMilestone}
+                                    disabled={completingLoading}
+                                    className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                >
+                                    {completingLoading ? 'Gönderiliyor...' : `✓ Tamamla${milestonePhotos.length > 0 ? ` (${milestonePhotos.length} görsel)` : ''}`}
+                                </button>
+                            </div>
+                        </motion.div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Toast Notification */}
-            {toast && (
-                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                    {toast.message}
-                </div>
-            )}
+                {/* Brief Response Viewer Modal */}
+                {viewBriefAccount && (
+                    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50" onClick={() => setViewBriefAccount(null)}>
+                        <div
+                            className={`w-full md:max-w-2xl max-h-[85vh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-6 ${isAdminNight ? 'bg-[#111]' : 'bg-white'}`}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="w-10 h-1 rounded-full bg-current/20 mx-auto mb-5 md:hidden" />
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 className="text-lg font-bold">{viewBriefAccount.company}</h2>
+                                    <p className="text-xs opacity-40 mt-0.5">{viewBriefAccount.name} · {viewBriefAccount.briefFormType || 'Brief'}</p>
+                                </div>
+                                <button onClick={() => setViewBriefAccount(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-sm opacity-40 hover:opacity-100 hover:bg-current/10">✕</button>
+                            </div>
+
+                            {viewBriefAccount.briefResponses && Object.keys(viewBriefAccount.briefResponses).length > 0 ? (() => {
+                                const template = briefTemplates.find(t => t.id === viewBriefAccount.briefFormType);
+                                const questions = template?.questions || [];
+                                const responses = viewBriefAccount.briefResponses as Record<string, string | string[]>;
+                                return (
+                                    <div className="space-y-3">
+                                        {Object.entries(responses).map(([key, value]) => {
+                                            const question = questions.find(q => q.id === key);
+                                            const label = question?.question || key.replace(/_/g, ' ');
+                                            const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                                            if (!displayValue) return null;
+                                            return (
+                                                <div key={key} className={`p-4 rounded-xl ${isAdminNight ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1.5">{label}</p>
+                                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayValue}</p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })() : (
+                                <div className="text-center py-12 opacity-40">
+                                    <p className="text-4xl mb-3">📭</p>
+                                    <p className="text-sm">Henüz cevap yok</p>
+                                </div>
+                            )}
+
+                            {viewBriefAccount.briefSubmittedAt && (
+                                <p className="text-xs opacity-30 text-center mt-6">
+                                    Gönderim: {new Date(viewBriefAccount.briefSubmittedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Toast Notification */}
+                {toast && (
+                    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                        {toast.message}
+                    </div>
+                )}
 
             </AnimatePresence >
         </div >
