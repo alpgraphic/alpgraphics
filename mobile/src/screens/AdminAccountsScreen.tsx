@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+import { useCache } from '../lib/useCache';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -53,20 +54,25 @@ export default function AdminAccountsScreen({ navigation }: Props) {
     const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
     const [submittingTransaction, setSubmittingTransaction] = useState(false);
 
+    // SWR cache
+    const { loadCache, saveCache } = useCache<Account[]>('admin_accounts_v1', setAccounts, setLoading);
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadAccounts = useCallback(async () => {
         try {
             const result = await apiRequest<{ data: Account[] }>('/api/mobile/accounts');
             if (result.success && result.data?.data) {
                 const data = result.data.data;
-                // Handle both array (admin) and single object (shouldn't happen here)
-                setAccounts(Array.isArray(data) ? data : [data]);
+                const arr = Array.isArray(data) ? data : [data];
+                setAccounts(arr);
+                saveCache(arr);
             }
         } catch (error) {
             console.log('Accounts fetch failed');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => {
         loadAccounts();

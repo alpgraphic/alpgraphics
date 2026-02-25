@@ -17,6 +17,7 @@ import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useCache } from '../lib/useCache';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -212,19 +213,23 @@ export default function AdminProposalsScreen({ navigation }: Props) {
 
     // ── Data loading ──────────────────────────────────────────────────────────
 
+    // SWR cache
+    const { loadCache, saveCache } = useCache<Proposal[]>('admin_proposals_v1', setProposals, setLoading);
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadProposals = useCallback(async () => {
-        setLoading(true);
         try {
             const result = await apiRequest<{ proposals: Proposal[] }>('/api/mobile/proposals');
             if (result.success && result.data?.proposals) {
                 setProposals(result.data.proposals);
+                saveCache(result.data.proposals);
             }
         } catch {
             Alert.alert('Hata', 'Teklifler yüklenemedi');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => {
         loadProposals();

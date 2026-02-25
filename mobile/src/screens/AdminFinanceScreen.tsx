@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS, API_BASE_URL } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+import { useCache } from '../lib/useCache';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -62,6 +63,16 @@ export default function AdminFinanceScreen({ navigation }: Props) {
     const [newTransactionDate, setNewTransactionDate] = useState(new Date().toISOString().split('T')[0]);
     const [submittingTransaction, setSubmittingTransaction] = useState(false);
 
+    // SWR cache — show cached data instantly
+    interface FinanceCacheData { transactions: Transaction[]; stats: { revenue: number; expenses: number; profit: number; pending: number }; accounts: Account[] }
+    const setFinanceCacheData = useCallback((data: FinanceCacheData) => {
+        setTransactions(data.transactions);
+        setStats(data.stats);
+        setAccounts(data.accounts);
+    }, []);
+    const { loadCache, saveCache } = useCache<FinanceCacheData>('admin_finance_v1', setFinanceCacheData, setLoading);
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const fetchRates = async () => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/exchange-rates`);
@@ -80,30 +91,29 @@ export default function AdminFinanceScreen({ navigation }: Props) {
                 apiRequest<{ data: Account[] }>('/api/mobile/accounts'),
             ]);
 
-            if (txResult.success && txResult.data?.data) {
-                setTransactions(txResult.data.data);
-            }
+            const txData = (txResult.success && txResult.data?.data) ? txResult.data.data : [];
+            setTransactions(txData);
 
+            const statsData = { revenue: 0, expenses: 0, profit: 0, pending: 0 };
             if (dashResult.success && dashResult.data?.data?.stats) {
                 const s = dashResult.data.data.stats;
-                setStats({
-                    revenue: s.totalRevenue || 0,
-                    expenses: s.totalExpenses || 0,
-                    profit: s.profit || 0,
-                    pending: s.pendingPayments || 0,
-                });
+                statsData.revenue = s.totalRevenue || 0;
+                statsData.expenses = s.totalExpenses || 0;
+                statsData.profit = s.profit || 0;
+                statsData.pending = s.pendingPayments || 0;
             }
+            setStats(statsData);
 
-            if (accountsResult.success && accountsResult.data?.data) {
-                const data = accountsResult.data.data;
-                setAccounts(Array.isArray(data) ? data : []);
-            }
+            const accData = (accountsResult.success && accountsResult.data?.data) ? (Array.isArray(accountsResult.data.data) ? accountsResult.data.data : []) : [];
+            setAccounts(accData);
+
+            saveCache({ transactions: txData, stats: statsData, accounts: accData });
         } catch (error) {
             console.log('Finance data fetch failed');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => {
         fetchRates();

@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { logout, apiRequest } from '../lib/auth';
 import { registerForPushNotifications } from '../lib/notifications';
+import { useCache } from '../lib/useCache';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,17 @@ export default function AdminDashboardScreen({ navigation }: Props) {
     });
     const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
+    // SWR cache — show cached data instantly, refresh in background
+    const setCacheData = useCallback((data: { stats: DashboardStats; recentActivity: ActivityItem[] }) => {
+        setStats(data.stats);
+        setRecentActivity(data.recentActivity || []);
+    }, []);
+    const { loadCache, saveCache } = useCache<{ stats: DashboardStats; recentActivity: ActivityItem[] }>(
+        'admin_dashboard_v1', setCacheData, setLoading
+    );
+
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadDashboard = useCallback(async () => {
         try {
             const result = await apiRequest<{ data: { stats: DashboardStats; recentActivity: ActivityItem[] } }>(
@@ -67,13 +79,14 @@ export default function AdminDashboardScreen({ navigation }: Props) {
             if (result.success && result.data?.data) {
                 setStats(result.data.data.stats);
                 setRecentActivity(result.data.data.recentActivity || []);
+                saveCache(result.data.data);
             }
         } catch (error) {
             console.log('Dashboard fetch failed');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => {
         loadDashboard();
@@ -153,148 +166,148 @@ export default function AdminDashboardScreen({ navigation }: Props) {
                         <ActivityIndicator color={COLORS.primary} size="large" />
                     </View>
                 ) : (
-                <>
-                {/* Hero Stats Section */}
-                <View style={styles.heroSection}>
-                    <Text style={styles.heroLabel}>TOPLAM GELİR</Text>
-                    <View style={styles.heroRow}>
-                        <Text style={styles.heroCurrency}>₺</Text>
-                        <Text style={styles.heroValue}>{formatCurrency(stats.totalRevenue)}</Text>
-                    </View>
-                    <View style={styles.heroLine} />
-                </View>
-
-                {/* Stats Grid */}
-                <View style={styles.statsContainer}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.totalAccounts}</Text>
-                        <Text style={styles.statLabel}>Hesap</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={[styles.statNumber, styles.statAccent]}>{stats.pendingBriefs}</Text>
-                        <Text style={styles.statLabel}>Bekleyen</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.totalProjects}</Text>
-                        <Text style={styles.statLabel}>Proje</Text>
-                    </View>
-                </View>
-
-                {/* Navigation Cards */}
-                <View style={styles.cardsSection}>
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminAccounts')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Müşteriler</Text>
-                            <Text style={styles.cardSub}>Hesap yönetimi</Text>
-                        </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminBriefs')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Briefler</Text>
-                            <Text style={styles.cardSub}>İncele ve onayla</Text>
-                        </View>
-                        {stats.pendingBriefs > 0 && (
-                            <View style={styles.cardBadge}>
-                                <Text style={styles.cardBadgeText}>{stats.pendingBriefs}</Text>
+                    <>
+                        {/* Hero Stats Section */}
+                        <View style={styles.heroSection}>
+                            <Text style={styles.heroLabel}>TOPLAM GELİR</Text>
+                            <View style={styles.heroRow}>
+                                <Text style={styles.heroCurrency}>₺</Text>
+                                <Text style={styles.heroValue}>{formatCurrency(stats.totalRevenue)}</Text>
                             </View>
-                        )}
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminFinance')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Finans</Text>
-                            <Text style={styles.cardSub}>Gelir ve gider</Text>
+                            <View style={styles.heroLine} />
                         </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminProposals')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Teklifler</Text>
-                            <Text style={styles.cardSub}>Oluştur ve PDF al</Text>
+                        {/* Stats Grid */}
+                        <View style={styles.statsContainer}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{stats.totalAccounts}</Text>
+                                <Text style={styles.statLabel}>Hesap</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={[styles.statNumber, styles.statAccent]}>{stats.pendingBriefs}</Text>
+                                <Text style={styles.statLabel}>Bekleyen</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{stats.totalProjects}</Text>
+                                <Text style={styles.statLabel}>Proje</Text>
+                            </View>
                         </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminProjects')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Projeler</Text>
-                            <Text style={styles.cardSub}>Durum ve ilerleme</Text>
+                        {/* Navigation Cards */}
+                        <View style={styles.cardsSection}>
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminAccounts')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Müşteriler</Text>
+                                    <Text style={styles.cardSub}>Hesap yönetimi</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminBriefs')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Briefler</Text>
+                                    <Text style={styles.cardSub}>İncele ve onayla</Text>
+                                </View>
+                                {stats.pendingBriefs > 0 && (
+                                    <View style={styles.cardBadge}>
+                                        <Text style={styles.cardBadgeText}>{stats.pendingBriefs}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminFinance')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Finans</Text>
+                                    <Text style={styles.cardSub}>Gelir ve gider</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminProposals')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Teklifler</Text>
+                                    <Text style={styles.cardSub}>Oluştur ve PDF al</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminProjects')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Projeler</Text>
+                                    <Text style={styles.cardSub}>Durum ve ilerleme</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('AdminMessages')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Mesajlar</Text>
+                                    <Text style={styles.cardSub}>Müşterilerle iletişim</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.card}
+                                onPress={() => navigation.navigate('Planner')}
+                                activeOpacity={0.6}
+                            >
+                                <View style={styles.cardLeft}>
+                                    <Text style={styles.cardTitle}>Planlayıcı</Text>
+                                    <Text style={styles.cardSub}>Günlük görev listesi</Text>
+                                </View>
+                                <Text style={styles.cardArrow}>→</Text>
+                            </TouchableOpacity>
                         </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('AdminMessages')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Mesajlar</Text>
-                            <Text style={styles.cardSub}>Müşterilerle iletişim</Text>
-                        </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
+                        {/* Activity Section */}
+                        <View style={styles.activitySection}>
+                            <Text style={styles.sectionTitle}>Son Hareketler</Text>
 
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => navigation.navigate('Planner')}
-                        activeOpacity={0.6}
-                    >
-                        <View style={styles.cardLeft}>
-                            <Text style={styles.cardTitle}>Planlayıcı</Text>
-                            <Text style={styles.cardSub}>Günlük görev listesi</Text>
-                        </View>
-                        <Text style={styles.cardArrow}>→</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Activity Section */}
-                <View style={styles.activitySection}>
-                    <Text style={styles.sectionTitle}>Son Hareketler</Text>
-
-                    {recentActivity.length === 0 ? (
-                        <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, textAlign: 'center', padding: SPACING.md }}>
-                            Henüz hareket yok
-                        </Text>
-                    ) : (
-                        recentActivity.map((item, index) => (
-                            <View key={item.id || index} style={styles.activityRow}>
-                                <View style={styles.activityDot} />
-                                <Text style={styles.activityText}>
-                                    {item.accountName} — {item.type === 'Payment' ? 'Ödeme' : 'Borç'} ₺{item.amount?.toLocaleString()}
+                            {recentActivity.length === 0 ? (
+                                <Text style={{ fontSize: FONTS.sm, color: COLORS.textMuted, textAlign: 'center', padding: SPACING.md }}>
+                                    Henüz hareket yok
                                 </Text>
-                                <Text style={styles.activityTime}>{formatActivityTime(item.date)}</Text>
-                            </View>
-                        ))
-                    )}
-                </View>
-                </>
+                            ) : (
+                                recentActivity.map((item, index) => (
+                                    <View key={item.id || index} style={styles.activityRow}>
+                                        <View style={styles.activityDot} />
+                                        <Text style={styles.activityText}>
+                                            {item.accountName} — {item.type === 'Payment' ? 'Ödeme' : 'Borç'} ₺{item.amount?.toLocaleString()}
+                                        </Text>
+                                        <Text style={styles.activityTime}>{formatActivityTime(item.date)}</Text>
+                                    </View>
+                                ))
+                            )}
+                        </View>
+                    </>
                 )}
             </ScrollView>
         </View>

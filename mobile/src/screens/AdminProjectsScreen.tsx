@@ -10,6 +10,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+import { useCache } from '../lib/useCache';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
@@ -55,15 +56,21 @@ export default function AdminProjectsScreen({ navigation }: Props) {
     const [pickedImages, setPickedImages] = useState<AttachmentWithData[]>([]);
     const [completing, setCompleting] = useState(false);
 
+    // SWR cache
+    const { loadCache, saveCache } = useCache<Project[]>('admin_projects_v1', setProjects, setLoading);
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadProjects = useCallback(async () => {
         try {
             const result = await apiRequest<{ data: Project[] }>('/api/mobile/projects');
             if (result.success && result.data?.data) {
-                setProjects(Array.isArray(result.data.data) ? result.data.data : []);
+                const arr = Array.isArray(result.data.data) ? result.data.data : [];
+                setProjects(arr);
+                saveCache(arr);
             }
         } catch { console.log('Projects fetch failed'); }
         finally { setLoading(false); }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
     const onRefresh = async () => { setRefreshing(true); await loadProjects(); setRefreshing(false); };

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+import { useCache } from '../lib/useCache';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -38,6 +39,10 @@ export default function AdminBriefsScreen({ navigation }: Props) {
     const [selectedBrief, setSelectedBrief] = useState<Brief | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
+    // SWR cache
+    const { loadCache, saveCache } = useCache<Brief[]>('admin_briefs_v1', setBriefs, setLoading);
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadBriefs = useCallback(async () => {
         try {
             // Use accounts endpoint - briefs are part of accounts data
@@ -56,13 +61,14 @@ export default function AdminBriefsScreen({ navigation }: Props) {
                         responses: acc.briefResponses || undefined,
                     }));
                 setBriefs(briefsList);
+                saveCache(briefsList);
             }
         } catch (error) {
             console.log('Briefs fetch failed');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveCache]);
 
     useEffect(() => {
         loadBriefs();
@@ -296,7 +302,7 @@ export default function AdminBriefsScreen({ navigation }: Props) {
                                         {
                                             color: selectedBrief.status === 'approved' ? COLORS.success
                                                 : selectedBrief.status === 'submitted' ? COLORS.warning
-                                                : COLORS.textMuted
+                                                    : COLORS.textMuted
                                         }
                                     ]}>
                                         {getStatusLabel(selectedBrief.status)}

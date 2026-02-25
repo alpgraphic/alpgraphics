@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+import { useCache } from '../lib/useCache';
 
 type Props = NativeStackScreenProps<any, 'ProjectMilestones'>;
 
@@ -36,6 +37,12 @@ export default function ProjectMilestonesScreen({ route, navigation }: Props) {
     const [imageData, setImageData] = useState<Record<string, MilestoneAttachment[]>>({});
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
 
+    // SWR cache per project
+    const { loadCache, saveCache } = useCache<MilestoneDetail[]>(
+        `milestones_${projectId}_v1`, setMilestones, setLoading
+    );
+    useEffect(() => { loadCache(); }, [loadCache]);
+
     const loadMilestones = useCallback(async () => {
         try {
             const result = await apiRequest<{ data: MilestoneDetail[] }>(
@@ -43,10 +50,11 @@ export default function ProjectMilestonesScreen({ route, navigation }: Props) {
             );
             if (result.success && result.data?.data) {
                 setMilestones(result.data.data);
+                saveCache(result.data.data);
             }
         } catch { console.log('Milestones load failed'); }
         finally { setLoading(false); setRefreshing(false); }
-    }, [projectId]);
+    }, [projectId, saveCache]);
 
     useEffect(() => { loadMilestones(); }, [loadMilestones]);
     const onRefresh = () => { setRefreshing(true); loadMilestones(); };
