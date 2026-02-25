@@ -151,6 +151,59 @@ export async function PUT(request: NextRequest) {
     }
 }
 
+// POST /api/mobile/projects - Create new project (Admin only)
+export async function POST(request: NextRequest) {
+    try {
+        const rateLimited = await rateLimitMiddleware(request, 'api');
+        if (rateLimited) return rateLimited;
+
+        const session = await verifyMobileSession();
+        if (!session?.userId || session.role !== 'admin') {
+            return NextResponse.json({ success: false, error: 'Yetkisiz' }, { status: 403 });
+        }
+
+        const body = await request.json();
+        const { title, client, category, linkedAccountId, budget, currency } = body;
+
+        if (!title?.trim()) {
+            return NextResponse.json({ success: false, error: 'Proje başlığı gerekli' }, { status: 400 });
+        }
+
+        const projects = await getProjectsCollection();
+        const now = new Date();
+
+        const doc: Record<string, any> = {
+            title: title.trim(),
+            client: client?.trim() || '',
+            category: category?.trim() || 'New Work',
+            year: String(now.getFullYear()),
+            image: '',
+            description: '',
+            status: 'active',
+            progress: 0,
+            tasks: [],
+            files: [],
+            team: [],
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        if (linkedAccountId) doc.linkedAccountId = linkedAccountId;
+        if (budget) doc.budget = budget;
+        if (currency) doc.currency = currency;
+
+        const result = await projects.insertOne(doc as any);
+
+        return NextResponse.json({
+            success: true,
+            data: { id: result.insertedId.toString(), ...doc },
+        });
+    } catch (error) {
+        console.error('Mobile projects POST error:', error);
+        return NextResponse.json({ success: false, error: 'Proje oluşturulamadı' }, { status: 500 });
+    }
+}
+
 // OPTIONS Handle CORS
 export async function OPTIONS() {
     const response = new NextResponse(null, { status: 204 });

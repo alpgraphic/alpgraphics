@@ -48,6 +48,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'projectId gerekli' }, { status: 400 });
         }
 
+        // Admin sees all milestones; Client only sees completed ones
+        // (admin completes milestone with photos → client sees the result)
         const query = session.role === 'admin'
             ? { projectId }
             : { projectId, status: 'completed' as const };
@@ -60,8 +62,15 @@ export async function GET(request: NextRequest) {
             .sort({ order: 1, createdAt: 1 })
             .toArray();
 
+        // For clients, also get total milestone count (including pending) for progress calculation
+        let totalMilestoneCount = milestones.length;
+        if (session.role !== 'admin') {
+            totalMilestoneCount = await col.countDocuments({ projectId });
+        }
+
         return NextResponse.json({
             success: true,
+            totalCount: totalMilestoneCount,
             data: milestones.map(m => ({
                 id: m._id?.toString(),
                 projectId: m.projectId,
@@ -96,7 +105,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { projectId, title, description } = body;
+        const { projectId, title, description, attachments: rawAttachments } = body;
 
         if (!projectId || !title?.trim()) {
             return NextResponse.json({ success: false, error: 'projectId ve title gerekli' }, { status: 400 });
@@ -120,6 +129,16 @@ export async function POST(request: NextRequest) {
             .toArray();
         const order = (lastMilestone[0]?.order ?? -1) + 1;
 
+        // Process attachments if provided
+        const attachments: { id: string; imageData: string; mimeType: string }[] = [];
+        if (Array.isArray(rawAttachments)) {
+            for (const att of rawAttachments) {
+                if (att.id && att.imageData && att.mimeType) {
+                    attachments.push({ id: att.id, imageData: att.imageData, mimeType: att.mimeType });
+                }
+            }
+        }
+
         const doc = {
             projectId,
             accountId,
@@ -127,7 +146,7 @@ export async function POST(request: NextRequest) {
             description: description?.trim() ?? undefined,
             status: 'pending' as const,
             order,
-            attachments: [],
+            attachments,
             feedback: {},
             createdAt: new Date(),
         };

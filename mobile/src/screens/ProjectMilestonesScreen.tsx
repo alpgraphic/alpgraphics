@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    ActivityIndicator, Image, RefreshControl, Alert,
+    ActivityIndicator, Image, RefreshControl, Alert, Modal,
+    Dimensions, TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -36,6 +37,10 @@ export default function ProjectMilestonesScreen({ route, navigation }: Props) {
     // Which milestones have their images loaded
     const [imageData, setImageData] = useState<Record<string, MilestoneAttachment[]>>({});
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+    // Lightbox
+    const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+    // Total milestone count (including pending) from API
+    const [totalMilestoneCount, setTotalMilestoneCount] = useState(0);
 
     // SWR cache per project
     const { loadCache, saveCache } = useCache<MilestoneDetail[]>(
@@ -45,12 +50,13 @@ export default function ProjectMilestonesScreen({ route, navigation }: Props) {
 
     const loadMilestones = useCallback(async () => {
         try {
-            const result = await apiRequest<{ data: MilestoneDetail[] }>(
+            const result = await apiRequest<{ data: MilestoneDetail[]; totalCount?: number }>(
                 `/api/mobile/milestones?projectId=${projectId}`
             );
             if (result.success && result.data?.data) {
                 setMilestones(result.data.data);
                 saveCache(result.data.data);
+                if (result.data.totalCount != null) setTotalMilestoneCount(result.data.totalCount);
             }
         } catch { console.log('Milestones load failed'); }
         finally { setLoading(false); setRefreshing(false); }
@@ -108,138 +114,160 @@ export default function ProjectMilestonesScreen({ route, navigation }: Props) {
     };
 
     const completedCount = milestones.filter(m => m.status === 'completed').length;
-    const totalCount = milestones.length;
+    const totalCount = totalMilestoneCount > 0 ? totalMilestoneCount : milestones.length;
     const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
     return (
-        <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Text style={styles.backText}>← Geri</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{projectTitle ?? 'Süreç'}</Text>
-                <View style={{ width: 44 }} />
-            </View>
+        <>
+            <View style={styles.container}>
+                <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                        <Text style={styles.backText}>← Geri</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle} numberOfLines={1}>{projectTitle ?? 'Süreç'}</Text>
+                    <View style={{ width: 44 }} />
+                </View>
 
-            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
+                <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
 
-                {/* Progress Summary */}
-                {totalCount > 0 && (
-                    <View style={styles.progressCard}>
-                        <View style={styles.progressTop}>
-                            <Text style={styles.progressTitle}>Proje İlerlemesi</Text>
-                            <Text style={styles.progressPct}>{progress}%</Text>
-                        </View>
-                        <View style={styles.progressBg}>
-                            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                        </View>
-                        <Text style={styles.progressSub}>{completedCount} / {totalCount} adım tamamlandı</Text>
-                    </View>
-                )}
-
-                {loading ? (
-                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
-                        <ActivityIndicator color={COLORS.primary} size="large" />
-                    </View>
-                ) : milestones.length === 0 ? (
-                    <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
-                        <Text style={styles.emptyText}>Henüz bir süreç adımı eklenmedi.</Text>
-                    </View>
-                ) : milestones.map((ms, idx) => {
-                    const isExpanded = expandedId === ms.id;
-                    const images = imageData[ms.id] ?? [];
-                    const isLoadingImg = loadingImages.has(ms.id);
-                    const attachCount = ms.attachmentCount ?? ms.attachments?.length ?? 0;
-
-                    return (
-                        <View key={ms.id} style={styles.msRow}>
-                            {/* Timeline */}
-                            <View style={styles.timeline}>
-                                <View style={[styles.dot, { backgroundColor: ms.status === 'completed' ? COLORS.success : COLORS.border }]}>
-                                    {ms.status === 'completed'
-                                        ? <Text style={styles.dotCheck}>✓</Text>
-                                        : <Text style={styles.dotNum}>{idx + 1}</Text>}
-                                </View>
-                                {idx < milestones.length - 1 && <View style={styles.line} />}
+                    {/* Progress Summary */}
+                    {totalCount > 0 && (
+                        <View style={styles.progressCard}>
+                            <View style={styles.progressTop}>
+                                <Text style={styles.progressTitle}>Proje İlerlemesi</Text>
+                                <Text style={styles.progressPct}>{progress}%</Text>
                             </View>
+                            <View style={styles.progressBg}>
+                                <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                            </View>
+                            <Text style={styles.progressSub}>{completedCount} / {totalCount} adım tamamlandı</Text>
+                        </View>
+                    )}
 
-                            {/* Card */}
-                            <TouchableOpacity
-                                style={[styles.msCard, ms.status === 'pending' && styles.msCardPending]}
-                                activeOpacity={0.85}
-                                onPress={() => ms.status === 'completed' ? toggleExpand(ms) : null}
-                                disabled={ms.status === 'pending'}
-                            >
-                                <View style={styles.msCardTop}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.msTitle, ms.status === 'pending' && styles.msTitlePending]}>
-                                            {ms.title}
-                                        </Text>
-                                        {ms.description ? (
-                                            <Text style={styles.msDesc}>{ms.description}</Text>
-                                        ) : null}
-                                        {ms.completedAt ? (
-                                            <Text style={styles.msDate}>
-                                                {new Date(ms.completedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                            </Text>
-                                        ) : null}
+                    {loading ? (
+                        <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                            <ActivityIndicator color={COLORS.primary} size="large" />
+                        </View>
+                    ) : milestones.length === 0 ? (
+                        <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
+                            <Text style={styles.emptyText}>Henüz bir süreç adımı eklenmedi.</Text>
+                        </View>
+                    ) : milestones.map((ms, idx) => {
+                        const isExpanded = expandedId === ms.id;
+                        const images = imageData[ms.id] ?? [];
+                        const isLoadingImg = loadingImages.has(ms.id);
+                        const attachCount = ms.attachmentCount ?? ms.attachments?.length ?? 0;
+
+                        return (
+                            <View key={ms.id} style={styles.msRow}>
+                                {/* Timeline */}
+                                <View style={styles.timeline}>
+                                    <View style={[styles.dot, { backgroundColor: ms.status === 'completed' ? COLORS.success : COLORS.border }]}>
+                                        {ms.status === 'completed'
+                                            ? <Text style={styles.dotCheck}>✓</Text>
+                                            : <Text style={styles.dotNum}>{idx + 1}</Text>}
                                     </View>
-                                    {ms.status === 'completed' && attachCount > 0 && (
-                                        <Text style={styles.chevron}>{isExpanded ? '▲' : '▼'}</Text>
-                                    )}
-                                    {ms.status === 'pending' && (
-                                        <View style={styles.pendingBadge}>
-                                            <Text style={styles.pendingBadgeText}>Bekliyor</Text>
+                                    {idx < milestones.length - 1 && <View style={styles.line} />}
+                                </View>
+
+                                {/* Card */}
+                                <TouchableOpacity
+                                    style={[styles.msCard, ms.status === 'pending' && styles.msCardPending]}
+                                    activeOpacity={0.85}
+                                    onPress={() => ms.status === 'completed' ? toggleExpand(ms) : null}
+                                    disabled={ms.status === 'pending'}
+                                >
+                                    <View style={styles.msCardTop}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.msTitle, ms.status === 'pending' && styles.msTitlePending]}>
+                                                {ms.title}
+                                            </Text>
+                                            {ms.description ? (
+                                                <Text style={styles.msDesc}>{ms.description}</Text>
+                                            ) : null}
+                                            {ms.completedAt ? (
+                                                <Text style={styles.msDate}>
+                                                    {new Date(ms.completedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                </Text>
+                                            ) : null}
+                                        </View>
+                                        {ms.status === 'completed' && attachCount > 0 && (
+                                            <Text style={styles.chevron}>{isExpanded ? '▲' : '▼'}</Text>
+                                        )}
+                                        {ms.status === 'pending' && (
+                                            <View style={styles.pendingBadge}>
+                                                <Text style={styles.pendingBadgeText}>Bekliyor</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* Images + Feedback */}
+                                    {isExpanded && ms.status === 'completed' && (
+                                        <View style={styles.attachSection}>
+                                            {isLoadingImg ? (
+                                                <ActivityIndicator color={COLORS.primary} style={{ marginVertical: SPACING.md }} />
+                                            ) : images.length === 0 ? (
+                                                <Text style={styles.noImages}>Bu adımda görsel yok.</Text>
+                                            ) : images.map(att => {
+                                                const fb = getFeedback(ms.id, att.id);
+                                                return (
+                                                    <View key={att.id} style={styles.attachCard}>
+                                                        <TouchableOpacity activeOpacity={0.9}
+                                                            onPress={() => setLightboxUri(`data:${att.mimeType};base64,${att.imageData}`)}>
+                                                            <Image
+                                                                source={{ uri: `data:${att.mimeType};base64,${att.imageData}` }}
+                                                                style={styles.attachImg}
+                                                                resizeMode="cover"
+                                                            />
+                                                        </TouchableOpacity>
+                                                        <View style={styles.fbRow}>
+                                                            <TouchableOpacity
+                                                                style={[styles.fbBtn, fb === 'liked' && styles.fbBtnActive]}
+                                                                onPress={() => submitFeedback(ms.id, att.id, 'liked')}
+                                                            >
+                                                                <Text style={styles.fbEmoji}>👍</Text>
+                                                                <Text style={[styles.fbLabel, fb === 'liked' && styles.fbLabelActive]}>Beğendim</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={[styles.fbBtn, fb === 'disliked' && styles.fbBtnDisliked]}
+                                                                onPress={() => submitFeedback(ms.id, att.id, 'disliked')}
+                                                            >
+                                                                <Text style={styles.fbEmoji}>👎</Text>
+                                                                <Text style={[styles.fbLabel, fb === 'disliked' && styles.fbLabelDisliked]}>Beğenmedim</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </View>
+                                                );
+                                            })}
                                         </View>
                                     )}
-                                </View>
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    })}
 
-                                {/* Images + Feedback */}
-                                {isExpanded && ms.status === 'completed' && (
-                                    <View style={styles.attachSection}>
-                                        {isLoadingImg ? (
-                                            <ActivityIndicator color={COLORS.primary} style={{ marginVertical: SPACING.md }} />
-                                        ) : images.length === 0 ? (
-                                            <Text style={styles.noImages}>Bu adımda görsel yok.</Text>
-                                        ) : images.map(att => {
-                                            const fb = getFeedback(ms.id, att.id);
-                                            return (
-                                                <View key={att.id} style={styles.attachCard}>
-                                                    <Image
-                                                        source={{ uri: `data:${att.mimeType};base64,${att.imageData}` }}
-                                                        style={styles.attachImg}
-                                                        resizeMode="contain"
-                                                    />
-                                                    <View style={styles.fbRow}>
-                                                        <TouchableOpacity
-                                                            style={[styles.fbBtn, fb === 'liked' && styles.fbBtnActive]}
-                                                            onPress={() => submitFeedback(ms.id, att.id, 'liked')}
-                                                        >
-                                                            <Text style={styles.fbEmoji}>👍</Text>
-                                                            <Text style={[styles.fbLabel, fb === 'liked' && styles.fbLabelActive]}>Beğendim</Text>
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity
-                                                            style={[styles.fbBtn, fb === 'disliked' && styles.fbBtnDisliked]}
-                                                            onPress={() => submitFeedback(ms.id, att.id, 'disliked')}
-                                                        >
-                                                            <Text style={styles.fbEmoji}>👎</Text>
-                                                            <Text style={[styles.fbLabel, fb === 'disliked' && styles.fbLabelDisliked]}>Beğenmedim</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    );
-                })}
+                    <View style={{ height: 60 }} />
+                </ScrollView>
+            </View>
 
-                <View style={{ height: 60 }} />
-            </ScrollView>
-        </View>
+            {/* Lightbox Modal */}
+            <Modal visible={!!lightboxUri} transparent animationType="fade">
+                <TouchableWithoutFeedback onPress={() => setLightboxUri(null)}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
+                        <TouchableOpacity style={{ position: 'absolute', top: insets.top + 10, right: 20, zIndex: 10, padding: 10 }}
+                            onPress={() => setLightboxUri(null)}>
+                            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>✕</Text>
+                        </TouchableOpacity>
+                        {lightboxUri ? (
+                            <Image source={{ uri: lightboxUri }}
+                                style={{ width: Dimensions.get('window').width - 20, height: Dimensions.get('window').height * 0.75 }}
+                                resizeMode="contain" />
+                        ) : null}
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+        </>
     );
 }
 

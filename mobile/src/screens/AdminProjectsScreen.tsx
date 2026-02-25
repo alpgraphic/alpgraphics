@@ -3,7 +3,7 @@ import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
     RefreshControl, Alert, Modal, TextInput, ActivityIndicator,
     Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView,
-    Platform, Image, FlatList,
+    Platform, Image, FlatList, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -49,12 +49,26 @@ export default function AdminProjectsScreen({ navigation }: Props) {
     const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
     const [newMilestoneDesc, setNewMilestoneDesc] = useState('');
     const [addingMilestone, setAddingMilestone] = useState(false);
+    const [newMilestonePhotos, setNewMilestonePhotos] = useState<{ id: string; uri: string; base64: string; mimeType: string }[]>([]);
 
     // ── Complete Milestone Modal ───────────────────────────────────────────────
     const [completingMilestone, setCompletingMilestone] = useState<Milestone | null>(null);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [pickedImages, setPickedImages] = useState<AttachmentWithData[]>([]);
     const [completing, setCompleting] = useState(false);
+    // Lightbox + milestone image cache
+    const [lightboxRef, setLightboxRef] = useState<{ msId: string; attIdx: number } | null>(null);
+    const [msImageCache, setMsImageCache] = useState<Record<string, AttachmentWithData[]>>({});
+    const [loadingMsImages, setLoadingMsImages] = useState<Set<string>>(new Set());
+
+    // ── Create Project Modal ────────────────────────────────────────────────
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createTitle, setCreateTitle] = useState('');
+    const [createClient, setCreateClient] = useState('');
+    const [createCategory, setCreateCategory] = useState('New Work');
+    const [createAccountId, setCreateAccountId] = useState<string | null>(null);
+    const [creating, setCreating] = useState(false);
+    const [accounts, setAccounts] = useState<{ id: string; name: string; company?: string }[]>([]);
 
     // SWR cache
     const { loadCache, saveCache } = useCache<Project[]>('admin_projects_v1', setProjects, setLoading);
@@ -119,7 +133,30 @@ export default function AdminProjectsScreen({ navigation }: Props) {
         finally { setSubmitting(false); }
     };
 
-    // ── Add milestone ─────────────────────────────────────────────────────────
+    // ── Pick photos for new milestone ─────────────────────────────────────────
+    const pickMilestonePhoto = async () => {
+        if (newMilestonePhotos.length >= 5) { Alert.alert('Limit', 'En fazla 5 görsel'); return; }
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { Alert.alert('', 'Galeri izni gerekli'); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.7,
+            base64: true,
+            allowsMultipleSelection: true,
+            selectionLimit: 5 - newMilestonePhotos.length,
+        });
+        if (!result.canceled && result.assets) {
+            const newPhotos = result.assets.filter(a => a.base64).map(a => ({
+                id: Math.random().toString(36).slice(2),
+                uri: a.uri,
+                base64: a.base64!,
+                mimeType: a.mimeType || 'image/jpeg',
+            }));
+            setNewMilestonePhotos(prev => [...prev, ...newPhotos].slice(0, 5));
+        }
+    };
+
+    // ── Add milestone ─────────────────────────────────────────────────────────────
     const handleAddMilestone = async () => {
         if (!newMilestoneTitle.trim() || !selectedProject) return;
         setAddingMilestone(true);
@@ -142,6 +179,23 @@ export default function AdminProjectsScreen({ navigation }: Props) {
     };
 
     // ── Delete milestone ──────────────────────────────────────────────────────
+
+    // ── Load milestone images (lazy) ──────────────────────────────────────────
+    const loadMsImages = useCallback(async (msId: string) => {
+        if (msImageCache[msId] || loadingMsImages.has(msId)) return;
+        setLoadingMsImages(prev => new Set(prev).add(msId));
+        try {
+            const result = await apiRequest<{ data: any }>(`/api/mobile/milestones?milestoneId=${msId}`);
+            if (result.success && result.data?.data?.attachments) {
+                const atts = result.data.data.attachments.map((a: any) => ({
+                    id: a.id, imageData: a.imageData, mimeType: a.mimeType,
+                    uri: `data:${a.mimeType};base64,${a.imageData}`,
+                }));
+                setMsImageCache(prev => ({ ...prev, [msId]: atts }));
+            }
+        } catch { }
+        finally { setLoadingMsImages(prev => { const s = new Set(prev); s.delete(msId); return s; }); }
+    }, [msImageCache, loadingMsImages]);
     const handleDeleteMilestone = (ms: Milestone) => {
         Alert.alert('Adımı Sil', `"${ms.title}" silinsin mi?`, [
             { text: 'İptal', style: 'cancel' },
@@ -157,9 +211,12 @@ export default function AdminProjectsScreen({ navigation }: Props) {
 
     // ── Open complete milestone modal ─────────────────────────────────────────
     const openCompleteModal = (ms: Milestone) => {
+        console.log('[COMPLETE_MODAL] opening for:', ms.title);
         setCompletingMilestone(ms);
         setPickedImages([]);
-        setShowCompleteModal(true);
+        // iOS doesn't support nested modals — close project modal first
+        setShowProjectModal(false);
+        setTimeout(() => setShowCompleteModal(true), 350);
     };
 
     // ── Pick image ────────────────────────────────────────────────────────────
@@ -209,10 +266,47 @@ export default function AdminProjectsScreen({ navigation }: Props) {
                 setShowCompleteModal(false);
                 await loadMilestones(selectedProject.id);
                 await loadProjects();
+                // Reopen project modal to show updated state
+                setTimeout(() => setShowProjectModal(true), 350);
                 Alert.alert('✅ Tamamlandı', 'Müşteriye bildirim gönderildi');
             } else { Alert.alert('Hata', result.error || 'Tamamlanamadı'); }
         } catch { Alert.alert('Hata', 'Bağlantı hatası'); }
         finally { setCompleting(false); }
+    };
+
+    // ── Create project ─────────────────────────────────────────────────────
+    const openCreateModal = async () => {
+        setCreateTitle(''); setCreateClient(''); setCreateCategory('New Work'); setCreateAccountId(null);
+        setShowCreateModal(true);
+        // Fetch accounts for client picker
+        try {
+            const res = await apiRequest<{ data: any[] }>('/api/mobile/accounts');
+            if (res.success && res.data?.data) {
+                setAccounts(res.data.data.map((a: any) => ({ id: a.id || a._id, name: a.name, company: a.company })));
+            }
+        } catch { }
+    };
+
+    const handleCreateProject = async () => {
+        if (!createTitle.trim()) return;
+        setCreating(true);
+        try {
+            const result = await apiRequest('/api/mobile/projects', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: createTitle.trim(),
+                    client: createClient.trim(),
+                    category: createCategory,
+                    linkedAccountId: createAccountId || undefined,
+                }),
+            });
+            if (result.success) {
+                setShowCreateModal(false);
+                await loadProjects();
+                Alert.alert('✅ Başarılı', 'Yeni proje oluşturuldu');
+            } else { Alert.alert('Hata', result.error || 'Oluşturulamadı'); }
+        } catch { Alert.alert('Hata', 'Bağlantı hatası'); }
+        finally { setCreating(false); }
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -235,7 +329,9 @@ export default function AdminProjectsScreen({ navigation }: Props) {
                     <Text style={styles.backText}>← Geri</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Projeler</Text>
-                <View style={{ width: 44 }} />
+                <TouchableOpacity onPress={openCreateModal} style={{ backgroundColor: COLORS.primary, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: COLORS.textInverse, fontSize: 22, fontWeight: '700', marginTop: -1 }}>+</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}
@@ -264,132 +360,173 @@ export default function AdminProjectsScreen({ navigation }: Props) {
 
             {/* ── Project Detail Modal ── */}
             <Modal visible={showProjectModal} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.lg }]}>
-                        <View style={styles.handle} />
-                        <TouchableOpacity style={styles.closeX} onPress={() => setShowProjectModal(false)}>
-                            <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
-                        </TouchableOpacity>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                    <View style={styles.modalOverlay}>
+                        <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.lg }]}>
+                            <View style={styles.handle} />
+                            <TouchableOpacity style={styles.closeX} onPress={() => setShowProjectModal(false)}>
+                                <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+                            </TouchableOpacity>
 
-                        {selectedProject && (
-                            <ScrollView showsVerticalScrollIndicator={false}>
-                                <Text style={styles.modalTitle}>{selectedProject.title}</Text>
-                                <Text style={styles.modalSub}>{selectedProject.client} · {selectedProject.category}</Text>
+                            {selectedProject && (
+                                <ScrollView showsVerticalScrollIndicator={false}
+                                    keyboardShouldPersistTaps="handled"
+                                    keyboardDismissMode="on-drag">
+                                    <Text style={styles.modalTitle}>{selectedProject.title}</Text>
+                                    <Text style={styles.modalSub}>{selectedProject.client} · {selectedProject.category}</Text>
 
-                                {/* ── Status & Progress ── */}
-                                <Text style={styles.sectionLabel}>DURUM</Text>
-                                <View style={styles.statusRow}>
-                                    {(['active', 'completed', 'paused', 'cancelled'] as const).map(s => (
-                                        <TouchableOpacity key={s}
-                                            style={[styles.statusOpt, { borderColor: statusColor(s) }, editStatus === s && { backgroundColor: statusBg(s) }]}
-                                            onPress={() => setEditStatus(s)}>
-                                            <Text style={[styles.statusOptText, { color: statusColor(s) }, editStatus === s && { fontWeight: '700' }]}>{statusLabel(s)}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                    {/* ── Status & Progress ── */}
+                                    <Text style={styles.sectionLabel}>DURUM</Text>
+                                    <View style={styles.statusRow}>
+                                        {(['active', 'completed', 'paused', 'cancelled'] as const).map(s => (
+                                            <TouchableOpacity key={s}
+                                                style={[styles.statusOpt, { borderColor: statusColor(s) }, editStatus === s && { backgroundColor: statusBg(s) }]}
+                                                onPress={() => setEditStatus(s)}>
+                                                <Text style={[styles.statusOptText, { color: statusColor(s) }, editStatus === s && { fontWeight: '700' }]}>{statusLabel(s)}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
 
-                                <Text style={styles.sectionLabel}>İLERLEME (%)</Text>
-                                <View style={{ flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md }}>
-                                    <TextInput style={[styles.input, { flex: 1 }]} value={editProgress}
-                                        onChangeText={setEditProgress} keyboardType="decimal-pad"
-                                        placeholder="0-100" placeholderTextColor={COLORS.textMuted} />
-                                    <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProject} disabled={submitting}>
-                                        {submitting ? <ActivityIndicator color={COLORS.textInverse} size="small" /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* ── Milestones ── */}
-                                <View style={styles.milestoneHeader}>
-                                    <Text style={styles.sectionLabel}>SÜRECİ ADIMLAR</Text>
-                                    <TouchableOpacity style={styles.addMsBtn} onPress={() => setShowAddMilestone(true)}>
-                                        <Text style={styles.addMsBtnText}>+ Adım Ekle</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {milestonesLoading ? (
-                                    <ActivityIndicator color={COLORS.primary} style={{ marginVertical: SPACING.md }} />
-                                ) : milestones.length === 0 ? (
-                                    <Text style={styles.emptyText}>Henüz adım yok. "+ Adım Ekle" ile başla.</Text>
-                                ) : milestones.map((ms, idx) => (
-                                    <View key={ms.id} style={styles.msCard}>
-                                        <View style={styles.msLeft}>
-                                            <View style={[styles.msDot, { backgroundColor: ms.status === 'completed' ? COLORS.success : COLORS.border }]}>
-                                                {ms.status === 'completed' && <Text style={{ fontSize: 10, color: '#fff' }}>✓</Text>}
-                                                {ms.status === 'pending' && <Text style={{ fontSize: 10, color: COLORS.textMuted }}>{idx + 1}</Text>}
-                                            </View>
-                                            {idx < milestones.length - 1 && <View style={styles.msLine} />}
+                                    <Text style={styles.sectionLabel}>İLERLEME</Text>
+                                    <View style={{ marginBottom: SPACING.md }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs }}>
+                                            <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.primary }}>%{editProgress}</Text>
+                                            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProject} disabled={submitting}>
+                                                {submitting ? <ActivityIndicator color={COLORS.textInverse} size="small" /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
+                                            </TouchableOpacity>
                                         </View>
-                                        <View style={styles.msBody}>
-                                            <Text style={[styles.msTitle, ms.status === 'completed' && styles.msTitleDone]}>{ms.title}</Text>
-                                            {ms.description ? <Text style={styles.msDesc}>{ms.description}</Text> : null}
-                                            {ms.hasAttachments && (
-                                                <Text style={styles.msAttachInfo}>
-                                                    📎 {ms.attachmentCount} görsel
-                                                    {feedbackEmoji(ms.feedback) ? `  ·  ${feedbackEmoji(ms.feedback)}` : ''}
-                                                </Text>
-                                            )}
-                                            {ms.completedAt && (
-                                                <Text style={styles.msDate}>
-                                                    {new Date(ms.completedAt).toLocaleDateString('tr-TR')}
-                                                </Text>
-                                            )}
-                                            {ms.status === 'pending' && (
-                                                <View style={styles.msActions}>
-                                                    <TouchableOpacity style={styles.completeBtn} onPress={() => openCompleteModal(ms)}>
-                                                        <Text style={styles.completeBtnText}>✓ Tamamla</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity onPress={() => handleDeleteMilestone(ms)}>
-                                                        <Text style={styles.deleteText}>Sil</Text>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            )}
+                                        <View style={{ height: 36, backgroundColor: COLORS.divider, borderRadius: 18, overflow: 'hidden', position: 'relative' }}
+                                            onTouchEnd={(e) => {
+                                                const w = Dimensions.get('window').width - (SPACING.lg * 2) - (SPACING.md * 2);
+                                                const x = Math.max(0, Math.min(e.nativeEvent.locationX, w));
+                                                const pct = Math.round((x / w) * 100);
+                                                setEditProgress(String(Math.max(0, Math.min(100, pct))));
+                                            }}>
+                                            <View style={{
+                                                height: '100%', width: `${editProgress}%` as any,
+                                                backgroundColor: COLORS.primary, borderRadius: 18,
+                                            }} />
+                                            <View style={{
+                                                position: 'absolute', right: parseInt(editProgress) > 90 ? undefined : 0, left: parseInt(editProgress) > 90 ? 0 : undefined,
+                                                top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: SPACING.sm,
+                                            }}>
+                                            </View>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                            <Text style={{ fontSize: 10, color: COLORS.textMuted }}>0%</Text>
+                                            <Text style={{ fontSize: 10, color: COLORS.textMuted }}>50%</Text>
+                                            <Text style={{ fontSize: 10, color: COLORS.textMuted }}>100%</Text>
                                         </View>
                                     </View>
-                                ))}
-                                <View style={{ height: 20 }} />
-                            </ScrollView>
-                        )}
+
+                                    {/* ── Milestones ── */}
+                                    <View style={styles.milestoneHeader}>
+                                        <Text style={styles.sectionLabel}>SÜRECİ ADIMLAR</Text>
+                                        <TouchableOpacity style={styles.addMsBtn} onPress={() => setShowAddMilestone(!showAddMilestone)}>
+                                            <Text style={styles.addMsBtnText}>{showAddMilestone ? '✕ Kapat' : '+ Adım Ekle'}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* ── Inline Add Milestone Form ── */}
+                                    {showAddMilestone && (
+                                        <View style={{ backgroundColor: COLORS.surface, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border }}>
+                                            <Text style={[styles.sectionLabel, { marginBottom: SPACING.xs }]}>BAŞLIK</Text>
+                                            <TextInput style={[styles.input, { marginBottom: SPACING.sm }]}
+                                                placeholder="Ör: Logo eskizi hazırlandı"
+                                                placeholderTextColor={COLORS.textMuted}
+                                                value={newMilestoneTitle} onChangeText={setNewMilestoneTitle}
+                                                returnKeyType="next" />
+
+                                            <Text style={[styles.sectionLabel, { marginBottom: SPACING.xs }]}>AÇIKLAMA (İSTEĞE BAĞLI)</Text>
+                                            <TextInput style={[styles.input, { height: 60, marginBottom: SPACING.sm, textAlignVertical: 'top' }]}
+                                                placeholder="Müşteriye gösterilecek açıklama..."
+                                                placeholderTextColor={COLORS.textMuted}
+                                                value={newMilestoneDesc} onChangeText={setNewMilestoneDesc}
+                                                multiline numberOfLines={2} />
+
+                                            <TouchableOpacity style={[styles.saveBtn, { alignSelf: 'stretch', alignItems: 'center', marginTop: SPACING.sm }]} onPress={handleAddMilestone} disabled={addingMilestone || !newMilestoneTitle.trim()}>
+                                                {addingMilestone ? <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                                    : <Text style={styles.saveBtnText}>Adımı Kaydet</Text>}
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+
+                                    {milestonesLoading ? (
+                                        <ActivityIndicator color={COLORS.primary} style={{ marginVertical: SPACING.md }} />
+                                    ) : milestones.length === 0 ? (
+                                        <Text style={styles.emptyText}>Henüz adım yok. "+ Adım Ekle" ile başla.</Text>
+                                    ) : milestones.map((ms, idx) => (
+                                        <View key={ms.id} style={styles.msCard}>
+                                            <View style={styles.msLeft}>
+                                                <View style={[styles.msDot, { backgroundColor: ms.status === 'completed' ? COLORS.success : COLORS.border }]}>
+                                                    {ms.status === 'completed' && <Text style={{ fontSize: 10, color: '#fff' }}>✓</Text>}
+                                                    {ms.status === 'pending' && <Text style={{ fontSize: 10, color: COLORS.textMuted }}>{idx + 1}</Text>}
+                                                </View>
+                                                {idx < milestones.length - 1 && <View style={styles.msLine} />}
+                                            </View>
+                                            <View style={styles.msBody}>
+                                                <Text style={[styles.msTitle, ms.status === 'completed' && styles.msTitleDone]}>{ms.title}</Text>
+                                                {ms.description ? <Text style={styles.msDesc}>{ms.description}</Text> : null}
+                                                {ms.hasAttachments && (
+                                                    <Text style={styles.msAttachInfo}>
+                                                        📎 {ms.attachmentCount} görsel
+                                                        {feedbackEmoji(ms.feedback) ? `  ·  ${feedbackEmoji(ms.feedback)}` : ''}
+                                                    </Text>
+                                                )}
+                                                {/* Show images for completed milestones */}
+                                                {ms.status === 'completed' && ms.hasAttachments && (
+                                                    <View style={{ marginTop: SPACING.xs }}>
+                                                        {!msImageCache[ms.id] ? (
+                                                            <TouchableOpacity onPress={() => loadMsImages(ms.id)}
+                                                                style={{ paddingVertical: 4 }}>
+                                                                {loadingMsImages.has(ms.id)
+                                                                    ? <ActivityIndicator size="small" color={COLORS.primary} />
+                                                                    : <Text style={{ fontSize: FONTS.xs, color: COLORS.primary, fontWeight: FONTS.semibold as any }}>📷 Görselleri Gör</Text>}
+                                                            </TouchableOpacity>
+                                                        ) : (
+                                                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                                                {msImageCache[ms.id].map(att => (
+                                                                    <TouchableOpacity key={att.id} activeOpacity={0.85}
+                                                                        onPress={() => {
+                                                                            const attIdx = msImageCache[ms.id].findIndex(a => a.id === att.id);
+                                                                            setLightboxRef({ msId: ms.id, attIdx });
+                                                                            setShowProjectModal(false);
+                                                                        }}>
+                                                                        <Image source={{ uri: att.uri }}
+                                                                            style={{ width: 80, height: 80, borderRadius: RADIUS.sm, marginRight: SPACING.xs }}
+                                                                            resizeMode="cover" />
+                                                                    </TouchableOpacity>
+                                                                ))}
+                                                            </ScrollView>
+                                                        )}
+                                                    </View>
+                                                )}
+                                                {ms.completedAt && (
+                                                    <Text style={styles.msDate}>
+                                                        {new Date(ms.completedAt).toLocaleDateString('tr-TR')}
+                                                    </Text>
+                                                )}
+                                                {ms.status === 'pending' && (
+                                                    <View style={styles.msActions}>
+                                                        <TouchableOpacity style={styles.completeBtn} onPress={() => openCompleteModal(ms)}>
+                                                            <Text style={styles.completeBtnText}>✓ Tamamla</Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity onPress={() => handleDeleteMilestone(ms)}>
+                                                            <Text style={styles.deleteText}>Sil</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                    ))}
+                                    <View style={{ height: 40 }} />
+                                </ScrollView>
+                            )}
+                        </View>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
-            {/* ── Add Milestone Modal ── */}
-            <Modal visible={showAddMilestone} animationType="slide" transparent>
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback accessible={false}>
-                            <View style={[styles.modalContent, { maxHeight: '60%' }]}>
-                                <View style={styles.handle} />
-                                <Text style={styles.modalTitle}>Yeni Adım</Text>
-
-                                <Text style={styles.sectionLabel}>BAŞLIK</Text>
-                                <TextInput style={[styles.input, { marginBottom: SPACING.md }]}
-                                    placeholder="Ör: Logo eskizi hazırlandı"
-                                    placeholderTextColor={COLORS.textMuted}
-                                    value={newMilestoneTitle} onChangeText={setNewMilestoneTitle}
-                                    returnKeyType="next" />
-
-                                <Text style={styles.sectionLabel}>AÇIKLAMA (İSTEĞE BAĞLI)</Text>
-                                <TextInput style={[styles.input, { height: 80, marginBottom: SPACING.lg, textAlignVertical: 'top' }]}
-                                    placeholder="Müşteriye gösterilecek açıklama..."
-                                    placeholderTextColor={COLORS.textMuted}
-                                    value={newMilestoneDesc} onChangeText={setNewMilestoneDesc}
-                                    multiline numberOfLines={3} />
-
-                                <View style={{ flexDirection: 'row', gap: SPACING.md }}>
-                                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddMilestone(false)}>
-                                        <Text style={styles.cancelBtnText}>İptal</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.saveBtn} onPress={handleAddMilestone} disabled={addingMilestone || !newMilestoneTitle.trim()}>
-                                        {addingMilestone ? <ActivityIndicator color={COLORS.textInverse} size="small" />
-                                            : <Text style={styles.saveBtnText}>Ekle</Text>}
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </KeyboardAvoidingView>
-                </TouchableWithoutFeedback>
-            </Modal>
 
             {/* ── Complete Milestone Modal ── */}
             <Modal visible={showCompleteModal} animationType="slide" transparent>
@@ -425,7 +562,7 @@ export default function AdminProjectsScreen({ navigation }: Props) {
                         </Text>
 
                         <View style={{ flexDirection: 'row', gap: SPACING.md }}>
-                            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCompleteModal(false)}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowCompleteModal(false); setTimeout(() => setShowProjectModal(true), 350); }}>
                                 <Text style={styles.cancelBtnText}>İptal</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: COLORS.success }]}
@@ -437,7 +574,90 @@ export default function AdminProjectsScreen({ navigation }: Props) {
                     </View>
                 </View>
             </Modal>
-        </View>
+
+            {/* ── Create Project Modal ── */}
+            <Modal visible={showCreateModal} animationType="slide" transparent>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <View style={styles.modalOverlay}>
+                            <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.lg }]}>
+                                <View style={styles.handle} />
+                                <TouchableOpacity style={styles.closeX} onPress={() => setShowCreateModal(false)}>
+                                    <Text style={{ fontSize: 18, color: COLORS.textMuted }}>✕</Text>
+                                </TouchableOpacity>
+
+                                <Text style={styles.modalTitle}>Yeni Proje</Text>
+                                <Text style={styles.modalSub}>Proje bilgilerini doldurun</Text>
+
+                                <ScrollView showsVerticalScrollIndicator={false}>
+                                    <Text style={styles.sectionLabel}>PROJE ADI</Text>
+                                    <TextInput style={[styles.input, { marginBottom: SPACING.md }]}
+                                        value={createTitle} onChangeText={setCreateTitle}
+                                        placeholder="Ör: Logo Tasarımı" placeholderTextColor={COLORS.textMuted} />
+
+                                    <Text style={styles.sectionLabel}>MÜŞTERİ SEÇ (İSTEĞE BAĞLI)</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.sm }}>
+                                        <TouchableOpacity
+                                            style={[styles.statusOpt, { minWidth: 0, paddingHorizontal: SPACING.md, borderColor: !createAccountId ? COLORS.primary : COLORS.border }, !createAccountId && { backgroundColor: COLORS.primaryLight }]}
+                                            onPress={() => { setCreateAccountId(null); setCreateClient(''); }}>
+                                            <Text style={[styles.statusOptText, { color: !createAccountId ? COLORS.primary : COLORS.textMuted }]}>Yok</Text>
+                                        </TouchableOpacity>
+                                        {accounts.map(acc => (
+                                            <TouchableOpacity key={acc.id}
+                                                style={[styles.statusOpt, { minWidth: 0, paddingHorizontal: SPACING.md, borderColor: createAccountId === acc.id ? COLORS.primary : COLORS.border }, createAccountId === acc.id && { backgroundColor: COLORS.primaryLight }]}
+                                                onPress={() => { setCreateAccountId(acc.id); setCreateClient(acc.company || acc.name); }}>
+                                                <Text style={[styles.statusOptText, { color: createAccountId === acc.id ? COLORS.primary : COLORS.text }]}>{acc.company || acc.name}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+
+                                    <Text style={styles.sectionLabel}>MÜŞTERİ ADI</Text>
+                                    <TextInput style={[styles.input, { marginBottom: SPACING.md }]}
+                                        value={createClient} onChangeText={setCreateClient}
+                                        placeholder="Müşteri/Şirket Adı" placeholderTextColor={COLORS.textMuted} />
+
+                                    <Text style={styles.sectionLabel}>KATEGORİ</Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.lg }}>
+                                        {['New Work', 'Brand Page', 'Social Media', 'Web', 'Print'].map(cat => (
+                                            <TouchableOpacity key={cat}
+                                                style={[styles.statusOpt, { flex: 0, minWidth: 0, paddingHorizontal: SPACING.md, borderColor: createCategory === cat ? COLORS.primary : COLORS.border }, createCategory === cat && { backgroundColor: COLORS.primaryLight }]}
+                                                onPress={() => setCreateCategory(cat)}>
+                                                <Text style={[styles.statusOptText, { color: createCategory === cat ? COLORS.primary : COLORS.text }]}>{cat}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    <TouchableOpacity style={[styles.saveBtn, { alignSelf: 'stretch', alignItems: 'center' }]}
+                                        onPress={handleCreateProject} disabled={creating || !createTitle.trim()}>
+                                        {creating ? <ActivityIndicator color={COLORS.textInverse} size="small" />
+                                            : <Text style={styles.saveBtnText}>Proje Oluştur</Text>}
+                                    </TouchableOpacity>
+                                    <View style={{ height: 20 }} />
+                                </ScrollView>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Lightbox */}
+            <Modal visible={!!lightboxRef} transparent animationType="fade">
+                <TouchableWithoutFeedback onPress={() => { setLightboxRef(null); setTimeout(() => setShowProjectModal(true), 350); }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
+                        <TouchableOpacity style={{ position: 'absolute', top: insets.top + 10, right: 20, zIndex: 10, padding: 10 }}
+                            onPress={() => { setLightboxRef(null); setTimeout(() => setShowProjectModal(true), 350); }}>
+                            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>✕</Text>
+                        </TouchableOpacity>
+                        {lightboxRef && msImageCache[lightboxRef.msId]?.[lightboxRef.attIdx] ? (
+                            <Image source={{ uri: msImageCache[lightboxRef.msId][lightboxRef.attIdx].uri }}
+                                style={{ width: Dimensions.get('window').width - 20, height: Dimensions.get('window').height * 0.75 }}
+                                resizeMode="contain" />
+                        ) : null}
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+
+        </View >
     );
 }
 
