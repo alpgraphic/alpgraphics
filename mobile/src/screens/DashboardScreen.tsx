@@ -13,6 +13,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { logout, apiRequest, isBiometricAvailable, authenticateWithBiometric } from '../lib/auth';
 import { registerForPushNotifications } from '../lib/notifications';
+import * as SecureStore from 'expo-secure-store';
+
+const DASHBOARD_CACHE_KEY = 'client_dashboard_cache_v1';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -51,11 +54,30 @@ interface AccountData {
 export default function DashboardScreen({ navigation }: Props) {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [briefData, setBriefData] = useState<BriefData>({ status: 'pending' });
+    const [briefData, setBriefData] = useState<BriefData>({ status: 'none' });
     const [projects, setProjects] = useState<Project[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [account, setAccount] = useState<AccountData | null>(null);
     const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const cacheLoaded = React.useRef(false);
+
+    // ── Load cache first (instant render) ────────────────────────────────
+    useEffect(() => {
+        (async () => {
+            try {
+                const cached = await SecureStore.getItemAsync(DASHBOARD_CACHE_KEY);
+                if (cached && !cacheLoaded.current) {
+                    const data = JSON.parse(cached);
+                    if (data.briefData) setBriefData(data.briefData);
+                    if (data.projects) setProjects(data.projects);
+                    if (data.transactions) setTransactions(data.transactions);
+                    if (data.account) setAccount(data.account);
+                    setLoading(false);
+                    cacheLoaded.current = true;
+                }
+            } catch { /* ignore */ }
+        })();
+    }, []);
 
     const loadData = useCallback(async () => {
         try {
@@ -66,22 +88,27 @@ export default function DashboardScreen({ navigation }: Props) {
                 apiRequest<{ data: AccountData }>('/api/mobile/accounts'),
             ]);
 
-            if (briefResult.success && briefResult.data?.data) {
-                setBriefData(briefResult.data.data);
-            }
-            if (projectsResult.success && projectsResult.data?.data) {
-                setProjects(projectsResult.data.data);
-            }
-            if (transResult.success && transResult.data?.data) {
-                setTransactions(transResult.data.data);
-            }
+            const newBrief = briefResult.success && briefResult.data?.data ? briefResult.data.data : briefData;
+            const newProjects = projectsResult.success && projectsResult.data?.data ? projectsResult.data.data : projects;
+            const newTransactions = transResult.success && transResult.data?.data ? transResult.data.data : transactions;
+            let newAccount = account;
             if (accountResult.success && accountResult.data?.data) {
                 const accData = accountResult.data.data;
-                // Handle single object (not array)
-                if (!Array.isArray(accData)) {
-                    setAccount(accData as any);
-                }
+                if (!Array.isArray(accData)) newAccount = accData as any;
             }
+
+            setBriefData(newBrief);
+            setProjects(newProjects);
+            setTransactions(newTransactions);
+            setAccount(newAccount);
+
+            // Save to cache (fire-and-forget)
+            SecureStore.setItemAsync(DASHBOARD_CACHE_KEY, JSON.stringify({
+                briefData: newBrief,
+                projects: newProjects,
+                transactions: newTransactions,
+                account: newAccount,
+            })).catch(() => { });
         } catch (error) {
             console.log('Dashboard data fetch failed');
         } finally {
@@ -92,7 +119,6 @@ export default function DashboardScreen({ navigation }: Props) {
     useEffect(() => {
         isBiometricAvailable().then(setBiometricEnabled);
         loadData();
-        // Register for push notifications
         registerForPushNotifications().catch(console.error);
     }, [loadData]);
 

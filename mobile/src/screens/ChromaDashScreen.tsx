@@ -245,7 +245,7 @@ export default function ChromaDashScreen({ navigation }: Props) {
         // initialize → authenticate (tek zincir)
         svc.initialize()
             .then(() => svc.authenticate())
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => {
                 const s = svc.getStatus();
                 setGcState({

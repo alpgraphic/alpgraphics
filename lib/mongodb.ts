@@ -316,6 +316,14 @@ export async function ensureIndexes(): Promise<void> {
         await db.collection('game_scores').createIndex({ game: 1, gcPlayerId: 1 }, { unique: true });
         await db.collection('game_scores').createIndex({ game: 1, score: -1 });
 
+        // Messages: fast conversation queries + sorted retrieval
+        await db.collection('messages').createIndex({ accountId: 1, createdAt: -1 });
+        await db.collection('messages').createIndex({ accountId: 1, senderRole: 1, readAt: 1 });
+
+        // Typing status: auto-expire after TTL
+        await db.collection('typing_status').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+        await db.collection('typing_status').createIndex({ accountId: 1, userId: 1 }, { unique: true });
+
         indexesCreated = true;
     } catch (error) {
         console.error('Index creation error:', error);

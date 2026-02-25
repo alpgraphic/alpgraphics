@@ -25,8 +25,15 @@ export async function GET(request: NextRequest) {
         if (session.role === 'admin') {
             if (accountId) {
                 // Get messages for specific conversation
+                const afterParam = searchParams.get('after');
+                const query: any = { accountId };
+                if (afterParam) {
+                    // Incremental polling: only fetch messages newer than 'after'
+                    query.createdAt = { $gt: new Date(afterParam) };
+                }
+
                 const messages = await col
-                    .find({ accountId })
+                    .find(query)
                     .sort({ createdAt: 1 })
                     .limit(200)
                     .toArray();
@@ -52,9 +59,10 @@ export async function GET(request: NextRequest) {
                 });
             }
 
-            // Get all conversation summaries
+            // Get all conversation summaries — single pipeline with $lookup (no N+1)
+            const { ObjectId } = await import('mongodb');
             const pipeline = [
-                { $sort: { createdAt: -1 } },
+                { $sort: { createdAt: -1 as const } },
                 {
                     $group: {
                         _id: '$accountId',
@@ -73,48 +81,60 @@ export async function GET(request: NextRequest) {
                         },
                     },
                 },
-                { $sort: { lastCreatedAt: -1 } },
+                // Convert string _id to ObjectId for $lookup
+                {
+                    $addFields: {
+                        accountObjId: {
+                            $cond: {
+                                if: { $regexMatch: { input: '$_id', regex: /^[0-9a-fA-F]{24}$/ } },
+                                then: { $toObjectId: '$_id' },
+                                else: null,
+                            },
+                        },
+                    },
+                },
+                // $lookup replaces N+1 per-conversation findOne queries with a single join
+                {
+                    $lookup: {
+                        from: 'accounts',
+                        localField: 'accountObjId',
+                        foreignField: '_id',
+                        as: 'account',
+                    },
+                },
+                { $unwind: { path: '$account', preserveNullAndEmptyArrays: true } },
+                {
+                    $project: {
+                        accountId: '$_id',
+                        accountName: { $ifNull: ['$account.name', '$_id'] },
+                        companyName: { $ifNull: ['$account.company', { $ifNull: ['$account.name', '$_id'] }] },
+                        lastMessage: 1,
+                        lastSenderRole: 1,
+                        lastCreatedAt: 1,
+                        unreadCount: 1,
+                    },
+                },
+                { $sort: { lastCreatedAt: -1 as const } },
             ];
 
-            const conversations = await col.aggregate(pipeline as any[]).toArray();
+            const enriched = await col.aggregate(pipeline as any[]).toArray();
 
-            // Enrich with account names
-            const { getAccountsCollection } = await import('@/lib/mongodb');
-            const accounts = await getAccountsCollection();
-            const { ObjectId } = await import('mongodb');
-
-            const enriched = await Promise.all(
-                conversations.map(async conv => {
-                    let accountName = conv._id;
-                    let companyName = conv._id;
-                    try {
-                        const acc = ObjectId.isValid(conv._id)
-                            ? await accounts.findOne({ _id: new ObjectId(conv._id) } as any)
-                            : null;
-                        if (acc) {
-                            accountName = acc.name;
-                            companyName = (acc as any).company || acc.name;
-                        }
-                    } catch {}
-                    return {
-                        accountId: conv._id,
-                        accountName,
-                        companyName,
-                        lastMessage: conv.lastMessage,
-                        lastSenderRole: conv.lastSenderRole,
-                        lastCreatedAt: conv.lastCreatedAt,
-                        unreadCount: conv.unreadCount,
-                    };
-                })
-            );
-
-            return NextResponse.json({ success: true, data: enriched });
+            const response = NextResponse.json({ success: true, data: enriched });
+            // Cache for 10 seconds — reduces repeated calls while polling
+            response.headers.set('Cache-Control', 'private, max-age=10');
+            return response;
         }
 
         // Client: own conversation
         const clientAccountId = session.userId;
+        const afterParam = searchParams.get('after');
+        const clientQuery: any = { accountId: clientAccountId };
+        if (afterParam) {
+            clientQuery.createdAt = { $gt: new Date(afterParam) };
+        }
+
         const messages = await col
-            .find({ accountId: clientAccountId })
+            .find(clientQuery)
             .sort({ createdAt: 1 })
             .limit(200)
             .toArray();
@@ -194,49 +214,49 @@ export async function POST(request: NextRequest) {
 
         const result = await col.insertOne(message as any);
 
-        // Push notification to recipient
-        // We exclude the sender's own push token so that if admin tested
-        // the app as a client on the same device (same push token registered
-        // for both accounts), they don't receive a notification they sent.
-        try {
-            const senderTokens = await getTokensForUser(session.userId);
-
-            if (session.role === 'client') {
-                // Notify admin — skip tokens that also belong to the sender
-                const adminTokens = (await getAdminTokens()).filter(
-                    t => !senderTokens.includes(t)
-                );
-                if (adminTokens.length > 0) {
-                    await sendPushNotification(adminTokens, {
-                        title: `${senderName} mesaj gönderdi`,
-                        body: content.trim().substring(0, 100),
-                        data: { type: 'message', accountId: resolvedAccountId },
-                    });
-                }
-            } else {
-                // Notify client — skip tokens that also belong to the sender
-                const clientTokens = (await getTokensForUser(resolvedAccountId)).filter(
-                    t => !senderTokens.includes(t)
-                );
-                if (clientTokens.length > 0) {
-                    await sendPushNotification(clientTokens, {
-                        title: 'Alp Graphics',
-                        body: content.trim().substring(0, 100),
-                        data: { type: 'message', accountId: resolvedAccountId },
-                    });
-                }
-            }
-        } catch (notifErr) {
-            console.error('Message push notification error:', notifErr);
-        }
-
-        return NextResponse.json({
+        // Return response IMMEDIATELY — don't wait for push notification
+        const response = NextResponse.json({
             success: true,
             message: {
                 id: result.insertedId.toString(),
                 ...message,
             },
         });
+
+        // Push notification to recipient (fire-and-forget — don't block response)
+        (async () => {
+            try {
+                const senderTokens = await getTokensForUser(session.userId);
+
+                if (session.role === 'client') {
+                    const adminTokens = (await getAdminTokens()).filter(
+                        t => !senderTokens.includes(t)
+                    );
+                    if (adminTokens.length > 0) {
+                        await sendPushNotification(adminTokens, {
+                            title: `${senderName} mesaj gönderdi`,
+                            body: content.trim().substring(0, 100),
+                            data: { type: 'message', accountId: resolvedAccountId },
+                        });
+                    }
+                } else {
+                    const clientTokens = (await getTokensForUser(resolvedAccountId)).filter(
+                        t => !senderTokens.includes(t)
+                    );
+                    if (clientTokens.length > 0) {
+                        await sendPushNotification(clientTokens, {
+                            title: 'Alp Graphics',
+                            body: content.trim().substring(0, 100),
+                            data: { type: 'message', accountId: resolvedAccountId },
+                        });
+                    }
+                }
+            } catch (notifErr) {
+                console.error('Message push notification error:', notifErr);
+            }
+        })();
+
+        return response;
 
     } catch (error) {
         console.error('Messages POST error:', error);

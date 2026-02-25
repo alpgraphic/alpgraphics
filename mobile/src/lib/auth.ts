@@ -184,6 +184,10 @@ async function refreshAccessToken(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
     try {
+        // Remove push token FIRST (while we still have auth)
+        const { removePushToken } = await import('./notifications');
+        await removePushToken().catch(() => { });
+
         const accessToken = await storage.get(TOKEN_KEYS.ACCESS_TOKEN);
         if (accessToken) {
             await fetchWithTimeout(`${API_BASE_URL}/api/mobile/auth`, {
@@ -191,7 +195,7 @@ export async function logout(): Promise<void> {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                 },
-            }, 5000).catch(() => {});
+            }, 5000).catch(() => { });
         }
     } finally {
         await storage.delete(TOKEN_KEYS.ACCESS_TOKEN);

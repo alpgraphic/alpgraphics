@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -14,8 +14,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as SecureStore from 'expo-secure-store';
 import { COLORS, SPACING, FONTS, RADIUS } from '../lib/constants';
 import { apiRequest } from '../lib/auth';
+
+const CACHE_KEY = 'messages_cache_v1';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -43,12 +46,30 @@ export default function AdminMessagesScreen({ navigation }: Props) {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    const cacheLoaded = useRef(false);
 
     // New conversation modal
     const [showNewModal, setShowNewModal] = useState(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [accountsLoading, setAccountsLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
+
+    // ── Load cache on mount (instant render) ─────────────────────────────
+    useEffect(() => {
+        (async () => {
+            try {
+                const cached = await SecureStore.getItemAsync(CACHE_KEY);
+                if (cached && !cacheLoaded.current) {
+                    const parsed = JSON.parse(cached) as Conversation[];
+                    if (parsed.length > 0) {
+                        setConversations(parsed);
+                        setLoading(false); // Hide spinner immediately
+                    }
+                    cacheLoaded.current = true;
+                }
+            } catch { /* ignore */ }
+        })();
+    }, []);
 
     const loadConversations = useCallback(async () => {
         try {
@@ -57,6 +78,11 @@ export default function AdminMessagesScreen({ navigation }: Props) {
             );
             if (result.success && result.data?.data) {
                 setConversations(result.data.data);
+                // Save to cache (fire-and-forget)
+                SecureStore.setItemAsync(
+                    CACHE_KEY,
+                    JSON.stringify(result.data.data)
+                ).catch(() => { });
             }
         } catch {
             // silent
