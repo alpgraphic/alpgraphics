@@ -49,3 +49,8 @@ list-projects.js
 
 # Old reference files
 eski-dosyalar/
+
+# Mobile build artifacts
+mobile/*.ipa
+mobile/*.apk
+mobile/*.aab

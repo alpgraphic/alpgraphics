@@ -52,6 +52,7 @@ const ebStyles = StyleSheet.create({
 export default function App() {
     const notificationListener = useRef<Notifications.EventSubscription | null>(null);
     const responseListener = useRef<Notifications.EventSubscription | null>(null);
+    const navigationRef = useRef<any>(null);
 
     useEffect(() => {
         // Register for push notifications if user is already logged in
@@ -66,11 +67,43 @@ export default function App() {
             console.log('Notification received:', notification.request.content.title);
         });
 
-        // Listen for user tapping a notification
+        // Listen for user tapping a notification — navigate to relevant screen
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
             const data = response.notification.request.content.data as Record<string, any>;
             console.log('Notification tapped:', data?.type);
-            // Navigation handling could be added here via a ref to navigationRef
+
+            if (navigationRef.current) {
+                const nav = navigationRef.current;
+                switch (data?.type) {
+                    case 'message':
+                        if (data.accountId) {
+                            nav.navigate('Chat', {
+                                accountId: data.accountId,
+                                companyName: data.companyName || '',
+                                accountName: data.accountName || '',
+                            });
+                        } else {
+                            nav.navigate('AdminMessages');
+                        }
+                        break;
+                    case 'milestone':
+                        if (data.projectId) {
+                            nav.navigate('ProjectMilestones', {
+                                projectId: data.projectId,
+                                projectTitle: data.projectTitle || 'Proje',
+                            });
+                        }
+                        break;
+                    case 'brief':
+                        nav.navigate('AdminBriefs');
+                        break;
+                    case 'project':
+                        nav.navigate('AdminProjects');
+                        break;
+                    default:
+                        break;
+                }
+            }
         });
 
         return () => {
@@ -82,9 +115,12 @@ export default function App() {
     return (
         <ErrorBoundary>
             <StatusBar style="dark" />
-            <AppNavigator onAuthenticated={() => {
-                registerForPushNotifications().catch(console.error);
-            }} />
+            <AppNavigator
+                onAuthenticated={() => {
+                    registerForPushNotifications().catch(console.error);
+                }}
+                navigationRef={navigationRef}
+            />
         </ErrorBoundary>
     );
 }

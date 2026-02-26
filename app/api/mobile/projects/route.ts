@@ -25,8 +25,12 @@ export async function GET(request: NextRequest) {
         const projects = await getProjectsCollection();
 
         if (role === 'admin') {
-            // Admin sees all projects (lightweight list)
-            const allProjects = await projects.find({}, {
+            // Parse pagination params
+            const page = Math.max(1, parseInt(request.nextUrl.searchParams.get('page') || '0', 10));
+            const limit = Math.min(100, Math.max(1, parseInt(request.nextUrl.searchParams.get('limit') || '0', 10)));
+            const usePagination = page > 0 && limit > 0;
+
+            const query = projects.find({}, {
                 projection: {
                     pageBlocks: 0,
                     brandGuide: 0,
@@ -35,7 +39,18 @@ export async function GET(request: NextRequest) {
                     files: 0,
                     team: 0,
                 }
-            }).sort({ createdAt: -1 }).toArray();
+            }).sort({ createdAt: -1 });
+
+            let allProjects;
+            let totalCount = 0;
+
+            if (usePagination) {
+                totalCount = await projects.countDocuments({});
+                allProjects = await query.skip((page - 1) * limit).limit(limit).toArray();
+            } else {
+                allProjects = await query.toArray();
+                totalCount = allProjects.length;
+            }
 
             return NextResponse.json({
                 success: true,
@@ -54,6 +69,14 @@ export async function GET(request: NextRequest) {
                     currency: (p as any).currency,
                     createdAt: p.createdAt,
                 })),
+                ...(usePagination && {
+                    pagination: {
+                        page,
+                        limit,
+                        totalCount,
+                        totalPages: Math.ceil(totalCount / limit),
+                    }
+                }),
             });
         }
 

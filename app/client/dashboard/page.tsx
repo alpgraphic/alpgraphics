@@ -5,6 +5,231 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { briefTemplates, BriefQuestion } from "@/lib/briefTypes";
 
+// ─── Milestone Types ────────────────────────────────────────────────────────────
+interface MilestoneData {
+    id: string;
+    projectId: string;
+    title: string;
+    description?: string;
+    status: 'pending' | 'completed';
+    order: number;
+    hasAttachments: boolean;
+    attachmentCount: number;
+    completedAt?: string;
+    createdAt: string;
+}
+
+interface ClientProject {
+    id: string;
+    title: string;
+    status: string;
+    progress: number;
+}
+
+// ─── MilestoneTracker Component ─────────────────────────────────────────────────
+function MilestoneTracker({ account, handleLogout }: { account: any; handleLogout: () => void }) {
+    const [projects, setProjects] = useState<ClientProject[]>([]);
+    const [milestones, setMilestones] = useState<MilestoneData[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch client's projects
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch('/api/mobile/projects');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.data) {
+                        setProjects(data.data);
+                        if (data.data.length > 0) {
+                            setSelectedProjectId(data.data[0].id);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch projects:', err);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    // Fetch milestones when project selected
+    useEffect(() => {
+        if (!selectedProjectId) return;
+        (async () => {
+            try {
+                const res = await fetch(`/api/mobile/milestones?projectId=${selectedProjectId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        setMilestones(data.data || []);
+                        setTotalCount(data.totalCount || 0);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch milestones:', err);
+            }
+        })();
+    }, [selectedProjectId]);
+
+    const selectedProject = projects.find(p => p.id === selectedProjectId);
+    const completedCount = milestones.filter(m => m.status === 'completed').length;
+    const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    return (
+        <motion.div
+            key="work-status"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+        >
+            <div className="mb-12">
+                <h2 className="text-4xl font-[900] tracking-tight mb-2">İş Durumu</h2>
+                <p className="text-lg opacity-60">Projenizin güncel durumunu takip edin</p>
+            </div>
+
+            {loading ? (
+                <div className="text-center py-20">
+                    <div className="w-8 h-8 border-2 border-[#a62932] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-sm opacity-40">Yükleniyor...</p>
+                </div>
+            ) : projects.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 border border-black/5 text-center">
+                    <div className="text-5xl mb-4">📋</div>
+                    <h3 className="text-xl font-bold mb-2">Henüz Proje Yok</h3>
+                    <p className="text-sm opacity-60">Projeniz başladığında burada ilerleme adımlarını görebileceksiniz.</p>
+                </div>
+            ) : (
+                <>
+                    {/* Project Selector (if multiple) */}
+                    {projects.length > 1 && (
+                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                            {projects.map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => setSelectedProjectId(p.id)}
+                                    className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedProjectId === p.id
+                                            ? 'bg-[#a62932] text-white'
+                                            : 'bg-black/5 hover:bg-black/10'
+                                        }`}
+                                >
+                                    {p.title}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Progress Card */}
+                    <div className="bg-white rounded-2xl p-8 border border-black/5 mb-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-bold">{selectedProject?.title || 'Proje'}</h3>
+                                <p className="text-xs opacity-40 mt-1">{completedCount}/{totalCount} adım tamamlandı</p>
+                            </div>
+                            <span className="text-3xl font-[900] text-[#a62932]">{progress}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-black/5 rounded-full overflow-hidden">
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-[#a62932] to-[#d4434e] rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${progress}%` }}
+                                transition={{ duration: 0.8, ease: 'easeOut' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Milestone Timeline */}
+                    <div className="space-y-4 mb-8">
+                        <h4 className="text-sm font-bold uppercase tracking-widest opacity-40">Proje Adımları</h4>
+                        {milestones.length === 0 && totalCount === 0 ? (
+                            <div className="bg-white rounded-xl p-8 border border-black/5 text-center">
+                                <p className="text-sm opacity-40">Henüz adım eklenmedi</p>
+                            </div>
+                        ) : (
+                            <>
+                                {milestones.map((m, i) => (
+                                    <motion.div
+                                        key={m.id}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: i * 0.08 }}
+                                        className="bg-white rounded-xl p-6 border border-black/5 flex items-start gap-4"
+                                    >
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${m.status === 'completed' ? 'bg-green-500' : 'bg-black/10 text-black/30'
+                                            }`}>
+                                            {m.status === 'completed' ? '✓' : m.order + 1}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h5 className="font-bold">{m.title}</h5>
+                                            {m.description && (
+                                                <p className="text-sm opacity-60 mt-1">{m.description}</p>
+                                            )}
+                                            <div className="flex items-center gap-3 mt-2 text-xs opacity-40">
+                                                {m.completedAt && (
+                                                    <span>
+                                                        {new Date(m.completedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                    </span>
+                                                )}
+                                                {m.hasAttachments && (
+                                                    <span className="flex items-center gap-1">
+                                                        📷 {m.attachmentCount} görsel
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                                {/* Pending steps indicator */}
+                                {totalCount > completedCount && (
+                                    <div className="bg-black/[0.02] rounded-xl p-6 border border-dashed border-black/10 text-center">
+                                        <p className="text-sm opacity-40">
+                                            {totalCount - completedCount} adım daha devam ediyor...
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Info Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl p-6 border border-black/5">
+                            <h4 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-4">Hesap Durumu</h4>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="opacity-60">Toplam:</span>
+                                    <span className="font-bold">{account.totalDebt.toLocaleString('tr-TR')} ₺</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="opacity-60">Ödenen:</span>
+                                    <span className="font-bold text-green-600">{account.totalPaid.toLocaleString('tr-TR')} ₺</span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t">
+                                    <span className="opacity-60">Kalan:</span>
+                                    <span className={`font-bold ${account.balance > 0 ? 'text-[#a62932]' : 'text-green-600'}`}>
+                                        {account.balance.toLocaleString('tr-TR')} ₺
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-6 border border-black/5">
+                            <h4 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-4">İletişim</h4>
+                            <p className="text-sm opacity-60 mb-4">Sorularınız için:</p>
+                            <a href="mailto:hello@alpgraphics.com" className="text-sm font-bold text-[#a62932]">
+                                hello@alpgraphics.com
+                            </a>
+                        </div>
+                    </div>
+                </>
+            )}
+        </motion.div>
+    );
+}
+
 interface ClientAccount {
     id: string;
     name: string;
@@ -458,89 +683,9 @@ export default function ClientDashboard() {
                         </motion.div>
                     )}
 
-                    {/* APPROVED VIEW - Work Status */}
+                    {/* APPROVED VIEW - Work Status with Real Milestones */}
                     {account.briefStatus === 'approved' && (
-                        <motion.div
-                            key="work-status"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                        >
-                            <div className="mb-12">
-                                <h2 className="text-4xl font-[900] tracking-tight mb-2">İş Durumu</h2>
-                                <p className="text-lg opacity-60">Projenizin güncel durumunu takip edin</p>
-                            </div>
-
-                            {/* Progress Card */}
-                            <div className="bg-white rounded-2xl p-8 border border-black/5 mb-8">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-xl font-bold">Proje İlerlemesi</h3>
-                                    <span className="text-3xl font-[900] text-[#a62932]">25%</span>
-                                </div>
-                                <div className="w-full h-3 bg-black/5 rounded-full overflow-hidden mb-6">
-                                    <div className="h-full bg-[#a62932] rounded-full" style={{ width: '25%' }} />
-                                </div>
-                                <div className="grid grid-cols-4 gap-4">
-                                    {[
-                                        { name: 'Brief', status: 'done' },
-                                        { name: 'Tasarım', status: 'active' },
-                                        { name: 'Revizyon', status: 'pending' },
-                                        { name: 'Teslim', status: 'pending' },
-                                    ].map((step, i) => (
-                                        <div key={i} className="text-center">
-                                            <div className={`w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-sm font-bold ${step.status === 'done' ? 'bg-green-500' :
-                                                step.status === 'active' ? 'bg-[#a62932]' :
-                                                    'bg-black/10 text-black/30'
-                                                }`}>
-                                                {step.status === 'done' ? '✓' : i + 1}
-                                            </div>
-                                            <p className={`text-xs font-bold ${step.status === 'pending' ? 'opacity-30' : ''}`}>
-                                                {step.name}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Info Cards Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-white rounded-xl p-6 border border-black/5">
-                                    <h4 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-4">Dosyalar</h4>
-                                    <div className="text-center py-8 opacity-40">
-                                        <p className="text-3xl mb-2">📁</p>
-                                        <p className="text-xs">Henüz dosya yok</p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl p-6 border border-black/5">
-                                    <h4 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-4">Fatura</h4>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="opacity-60">Toplam:</span>
-                                            <span className="font-bold">{account.totalDebt.toLocaleString('tr-TR')} ₺</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="opacity-60">Ödenen:</span>
-                                            <span className="font-bold text-green-600">{account.totalPaid.toLocaleString('tr-TR')} ₺</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm pt-2 border-t">
-                                            <span className="opacity-60">Kalan:</span>
-                                            <span className={`font-bold ${account.balance > 0 ? 'text-[#a62932]' : 'text-green-600'}`}>
-                                                {account.balance.toLocaleString('tr-TR')} ₺
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-xl p-6 border border-black/5">
-                                    <h4 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-4">İletişim</h4>
-                                    <p className="text-sm opacity-60 mb-4">Sorularınız için:</p>
-                                    <a href="mailto:hello@alpgraphics.com" className="text-sm font-bold text-[#a62932]">
-                                        hello@alpgraphics.com
-                                    </a>
-                                </div>
-                            </div>
-                        </motion.div>
+                        <MilestoneTracker account={account} handleLogout={handleLogout} />
                     )}
                 </AnimatePresence>
             </main>

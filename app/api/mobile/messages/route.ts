@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
         // Push notification to recipient (fire-and-forget — don't block response)
         (async () => {
             try {
-                const senderTokens = await getTokensForUser(session.userId);
+                const senderTokens = await getTokensForUser(session.userId!);
 
                 if (session.role === 'client') {
                     const adminTokens = (await getAdminTokens()).filter(

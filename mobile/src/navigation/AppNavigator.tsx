@@ -46,6 +46,7 @@ export type RootStackParamList = {
 
 type Props = {
     onAuthenticated?: () => void;
+    navigationRef?: React.MutableRefObject<any>;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -58,7 +59,7 @@ function LoadingScreen() {
     );
 }
 
-export default function AppNavigator({ onAuthenticated }: Props) {
+export default function AppNavigator({ onAuthenticated, navigationRef: externalNavRef }: Props) {
     const [isReady, setIsReady] = useState(false);
     const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Welcome');
     const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
@@ -127,7 +128,12 @@ export default function AppNavigator({ onAuthenticated }: Props) {
     if (!isReady) return <LoadingScreen />;
 
     return (
-        <NavigationContainer ref={navigationRef}>
+        <NavigationContainer
+            ref={(ref) => {
+                (navigationRef as any).current = ref;
+                if (externalNavRef) externalNavRef.current = ref;
+            }}
+        >
             <Stack.Navigator
                 initialRouteName={initialRoute}
                 screenOptions={{

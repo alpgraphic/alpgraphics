@@ -12,10 +12,26 @@ import SEOSettings from "@/components/admin/SEOSettings";
 import CacheManager from "@/components/admin/CacheManager";
 // AIBrandGenerator removed - replaced with Brand Pages system
 import { briefTemplates } from "@/lib/briefTypes";
+import { OverviewTab, ProjectsTab, AccountsTab, FinanceTab, ProposalsTab } from "@/components/admin/tabs";
 
 export default function AdminDashboard() {
-    const { projects, addProject, deleteProject, invoices, addInvoice, expenses, addExpense, removeExpense, messages, markMessageRead, accounts, addAccount, updateAccount, deleteAccount, addTransaction, proposals, addProposal, updateProposal, deleteProposal, isAdminNight, toggleAdminTheme, lastError, clearError } = useAgency();
+    const { projects, addProject, deleteProject, expenses, addExpense, removeExpense, messages, markMessageRead, accounts, addAccount, updateAccount, deleteAccount, addTransaction, proposals, addProposal, updateProposal, deleteProposal, isAdminNight, toggleAdminTheme, lastError, clearError } = useAgency();
     const [activeTab, setActiveTab] = useState('overview');
+
+    // Live exchange rates from TCMB
+    const [exchangeRates, setExchangeRates] = useState<{ USD: number; EUR: number; GBP: number }>({ USD: 43.50, EUR: 51.30, GBP: 58.00 });
+    const [ratesLastUpdated, setRatesLastUpdated] = useState<string | null>(null);
+    useEffect(() => {
+        fetch('/api/exchange-rates')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.rates) {
+                    setExchangeRates(data.rates);
+                    setRatesLastUpdated(data.lastUpdated);
+                }
+            })
+            .catch(err => console.error('Exchange rate fetch failed:', err));
+    }, []);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -44,7 +60,7 @@ export default function AdminDashboard() {
     }, [lastError]);
 
     // Modal States
-    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
     const [showProjectModal, setShowProjectModal] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; type: 'project' | 'proposal' | 'expense' | 'account' | null; id: number | string | null; title: string }>({ show: false, type: null, id: null, title: '' });
@@ -56,9 +72,7 @@ export default function AdminDashboard() {
 
 
 
-    const [newInvClient, setNewInvClient] = useState('');
-    const [newInvAmount, setNewInvAmount] = useState('');
-    const [newInvStatus, setNewInvStatus] = useState<'Paid' | 'Pending' | 'Overdue'>('Pending');
+
 
     // Expense Form States
     const [newExpTitle, setNewExpTitle] = useState('');
@@ -116,6 +130,9 @@ export default function AdminDashboard() {
     const [historyAccountId, setHistoryAccountId] = useState<number | string | null>(null);
     const [accountDetailTab, setAccountDetailTab] = useState<'transactions' | 'projects'>('transactions');
 
+    // Search / Filter
+    const [searchQuery, setSearchQuery] = useState('');
+
 
 
     // Sync State
@@ -160,14 +177,14 @@ export default function AdminDashboard() {
     const handleCreateProject = (e: React.FormEvent) => {
         e.preventDefault();
         addProject({
-            id: Date.now(),
+            id: crypto.randomUUID(),
             title: newProjectTitle,
             client: newProjectClient,
             linkedAccountId: newProjectAccountId || undefined,
             category: "New Work",
-            year: "2026",
+            year: new Date().getFullYear().toString(),
             image: "/projects/p1.png",
-            description: "New project initialized by admin.",
+            description: "Yeni proje admin tarafından oluşturuldu.",
             status: 'Planning',
             progress: 0,
             tasks: [],
@@ -181,15 +198,15 @@ export default function AdminDashboard() {
     };
 
     const handleCreateBrandPage = () => {
-        const newProjectId = Date.now();
+        const newProjectId = crypto.randomUUID();
         addProject({
             id: newProjectId,
-            title: "New Brand Page",
+            title: "Yeni Marka Sayfası",
             client: "",
             category: "Brand Page",
-            year: "2026",
+            year: new Date().getFullYear().toString(),
             image: "",
-            description: "New brand page draft",
+            description: "Yeni marka sayfası taslağı",
             status: 'Planning',
             progress: 0,
             tasks: [],
@@ -201,29 +218,17 @@ export default function AdminDashboard() {
         router.push(`/admin/brand-page/${newProjectId}/edit`);
     };
 
-    const handleCreateInvoice = (e: React.FormEvent) => {
-        e.preventDefault();
-        addInvoice({
-            id: Math.floor(Math.random() * 1000) + 100, // Mock ID
-            client: newInvClient,
-            amount: newInvAmount,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            status: newInvStatus
-        });
-        setShowInvoiceModal(false);
-        setNewInvClient('');
-        setNewInvAmount('');
-    };
+
 
     const handleAddExpense = (e: React.FormEvent) => {
         e.preventDefault();
         addExpense({
-            id: Date.now(),
+            id: Date.now() + Math.floor(Math.random() * 10000),
             title: newExpTitle,
             amount: parseFloat(newExpAmount),
             currency: newExpCurrency,
             category: newExpCategory,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
         });
         setShowExpenseModal(false);
         setNewExpTitle('');
@@ -237,7 +242,7 @@ export default function AdminDashboard() {
 
         // Use context action which handles API call and state update
         addAccount({
-            id: Date.now(), // Temp ID, will be replaced by backend ID in context
+            id: crypto.randomUUID(),
             name: newAccountName,
             company: newAccountCompany,
             email: newAccountEmail,
@@ -378,25 +383,30 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteMilestone = async (milestoneId: string, projectId: string) => {
-        await fetch(`/api/mobile/milestones?id=${milestoneId}`, { method: 'DELETE' });
-        loadMilestones(projectId);
+        try {
+            const res = await fetch(`/api/mobile/milestones?id=${milestoneId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                showToast('Adım silinemedi', 'error');
+                return;
+            }
+            loadMilestones(projectId);
+            showToast('Adım silindi');
+        } catch {
+            showToast('Bağlantı hatası', 'error');
+        }
     };
 
     const handleAddTransaction = (e: React.FormEvent) => {
         e.preventDefault();
         if (selectedAccountId === null) return;
 
-        // Assuming addTransaction is available from useAgency context
-        // You would need to add `addTransaction` to the destructuring of `useAgency()`
-        // e.g., `const { ..., addTransaction, ... } = useAgency();`
-        // For now, this will cause a type error if not added.
         addTransaction(selectedAccountId, {
-            id: Date.now(),
+            id: Date.now() + Math.floor(Math.random() * 10000),
             accountId: selectedAccountId,
             type: transType,
             amount: parseFloat(transAmount),
             description: transDesc,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
         });
 
         setShowTransactionModal(false);
@@ -404,23 +414,19 @@ export default function AdminDashboard() {
         setTransDesc('');
     };
 
-    // Financial Logic (Exchange Rates Mock)
-    const RATES = { USD: 34.50, EUR: 37.20 };
-
+    // Financial Logic (Live Exchange Rates from TCMB)
+    // Revenue is calculated from accepted proposals
     const calculateTotalRevenueTRY = () => {
-        return invoices.filter(i => i.status === 'Paid').reduce((acc, curr) => {
-            const val = parseInt(curr.amount.replace(/[^0-9]/g, ''));
-            // Very naive check, assuming all invoices are TRY for now or formatted like ₺
-            // In a real app we would parse currency symbol.
-            return acc + val;
+        return proposals.filter(p => p.status === 'Accepted').reduce((acc, curr) => {
+            return acc + (curr.totalAmount || 0);
         }, 0);
     };
 
     const calculateTotalExpensesTRY = () => {
         return expenses.reduce((acc, curr) => {
             let val = curr.amount;
-            if (curr.currency === 'USD') val *= RATES.USD;
-            if (curr.currency === 'EUR') val *= RATES.EUR;
+            if (curr.currency === 'USD') val *= exchangeRates.USD;
+            if (curr.currency === 'EUR') val *= exchangeRates.EUR;
             return acc + val;
         }, 0);
     };
@@ -435,30 +441,30 @@ export default function AdminDashboard() {
 
     const stats = [
         {
-            label: "Net Profit (YTD)",
-            value: "₺" + netProfit.toLocaleString(),
-            change: revenueVal > expenseVal ? `+${((netProfit / revenueVal) * 100).toFixed(1)}% Margin` : "Loss",
+            label: "Net Kâr (YTD)",
+            value: "₺" + netProfit.toLocaleString('tr-TR'),
+            change: revenueVal > expenseVal ? `+${((netProfit / revenueVal) * 100).toFixed(1)}% Marj` : "Zarar",
             icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
             color: netProfit > 0 ? 'text-green-500' : 'text-red-500'
         },
         {
-            label: "Total Revenue",
-            value: "₺" + revenueVal.toLocaleString(),
-            change: "Gross Income",
+            label: "Toplam Gelir",
+            value: "₺" + revenueVal.toLocaleString('tr-TR'),
+            change: "Brüt Gelir",
             icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
             color: 'text-[#a62932]'
         },
         {
-            label: "Active Projects",
+            label: "Aktif Projeler",
             value: activeProjectsCount.toString(),
-            change: `${projects.filter(p => p.status === 'Review').length} in Review`,
+            change: `${projects.filter(p => p.status === 'Review').length} İncelemede`,
             icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
             color: 'text-blue-500'
         },
         {
-            label: "Inbox",
+            label: "Gelen Kutusu",
             value: unreadMessages.toString(),
-            change: unreadMessages > 0 ? "New Messages" : "All Caught Up",
+            change: unreadMessages > 0 ? "Yeni Mesaj" : "Tamamlandı",
             icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
             color: unreadMessages > 0 ? 'text-yellow-500' : 'text-green-500'
         },
@@ -668,7 +674,20 @@ export default function AdminDashboard() {
                         </p>
                     </div>
                     {/* Global Actions per Tab */}
-                    <div className="flex gap-2 sm:gap-3 shrink-0">
+                    <div className="flex gap-2 sm:gap-3 shrink-0 items-center">
+                        {/* Search Bar — visible on project, account, proposal tabs */}
+                        {['projects', 'accounts', 'proposals'].includes(activeTab) && (
+                            <div className={`relative hidden sm:block`}>
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Ara..."
+                                    className={`pl-9 pr-4 py-2.5 rounded-xl text-xs font-medium w-48 transition-all focus:w-64 outline-none border ${isAdminNight ? 'bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-white/20' : 'bg-black/5 border-black/10 text-black placeholder:text-black/30 focus:border-black/20'}`}
+                                />
+                            </div>
+                        )}
                         {activeTab === 'projects' && (
                             <button onClick={() => setShowProjectModal(true)}
                                 className="bg-[#a62932] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#a62932]/20 hover:shadow-[#a62932]/40 active:scale-[0.98] transition-all whitespace-nowrap">
@@ -691,419 +710,75 @@ export default function AdminDashboard() {
                 </header>
 
                 {activeTab === 'overview' && (
-                    <>
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-8 md:mb-12">
-                            {stats.map((stat, i) => (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.1 }}
-                                    key={stat.label}
-                                    className={`border p-6 rounded-2xl relative overflow-hidden group transition-all hover:scale-[1.02] ${isAdminNight ? 'bg-[#0a0a0a]/60 border-white/5 hover:border-white/10' : 'bg-white/80 border-black/5 hover:border-black/10 hover:shadow-xl hover:shadow-black/5'}`}
-                                >
-                                    {/* Floating Icon */}
-                                    <div className={`absolute top-4 right-4 ${stat.color} opacity-20 group-hover:opacity-40 transition-opacity`}>
-                                        {stat.icon}
-                                    </div>
-
-                                    <h3 className="text-[10px] uppercase font-bold tracking-widest opacity-40 mb-3">{stat.label}</h3>
-                                    <p className="text-3xl font-black tracking-tight">{stat.value}</p>
-                                    <p className={`text-xs mt-3 ${stat.color} flex items-center gap-1 font-medium`}>
-                                        {stat.change}
-                                    </p>
-                                </motion.div>
-                            ))}
-                        </div>
-
-                        {/* Recent Activity */}
-                        <section>
-                            <h3 className="text-sm font-bold uppercase tracking-widest opacity-40 mb-6 flex items-center gap-2">
-                                Active Work <span className="w-full h-px bg-current/5 ml-4"></span>
-                            </h3>
-                            <div className="grid gap-4">
-                                {projects.filter(p => p.status === 'In Progress' || p.status === 'Review').length === 0 ? (
-                                    <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
-                                        <div className="text-5xl mb-4">🚀</div>
-                                        <h4 className="text-lg font-bold mb-2">Aktif İş Yok</h4>
-                                        <p className="text-sm opacity-50 max-w-xs mx-auto">Şu anda devam eden veya incelemede bekleyen proje bulunmuyor.</p>
-                                        <button
-                                            onClick={() => setActiveTab('projects')}
-                                            className="mt-6 px-6 py-2 text-xs font-bold uppercase tracking-widest bg-[#a62932] text-white rounded-lg hover:bg-[#a62932]/80 transition-colors"
-                                        >
-                                            Projelere Git
-                                        </button>
-                                    </div>
-                                ) : (
-                                    projects.filter(p => p.status === 'In Progress' || p.status === 'Review').map((project, i) => (
-                                        <div key={project.id}>
-                                            <ProjectCard project={project} index={i} isAdminNight={isAdminNight} />
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </section>
-                    </>
+                    <OverviewTab
+                        stats={stats}
+                        projects={projects}
+                        isAdminNight={isAdminNight}
+                        searchQuery={searchQuery}
+                        setActiveTab={setActiveTab}
+                        setDeleteConfirm={setDeleteConfirm}
+                    />
                 )}
 
                 {/* Operations Hub (Projects) */}
                 {activeTab === 'projects' && (
-                    <div className="space-y-12">
-                        {/* Kanban Board */}
-                        <div>
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-sm font-bold uppercase tracking-widest opacity-40">Kanban Board</h3>
-                                <div className="flex gap-4 text-[10px] uppercase font-bold tracking-widest opacity-40">
-                                    <button className="hover:opacity-100 transition-opacity">To Do</button>
-                                    <button className="hover:opacity-100 transition-opacity">In Progress</button>
-                                    <button className="hover:opacity-100 transition-opacity">Review</button>
-                                    <button className="hover:opacity-100 transition-opacity">Done</button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-                                {projects.map(project => (
-                                    <motion.div
-                                        key={project.id}
-                                        layoutId={`project-${project.id}`}
-                                        className={`group relative aspect-[16/9] rounded-lg overflow-hidden border transition-all ${isAdminNight ? 'border-white/10 bg-[#0a0a0a]' : 'border-black/5 bg-white'}`}
-                                    >
-                                        {/* Background Image */}
-                                        <img
-                                            src={project.category === 'Brand Page' && project.brandData?.logos?.light
-                                                ? project.brandData.logos.light
-                                                : project.image}
-                                            alt={project.title}
-                                            className="absolute inset-0 w-full h-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
-                                            onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                            }}
-                                        />
-                                        {/* Fallback gradient if no image */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-[#a62932]/20 to-[#1a1a1a]/80 -z-10" />
-
-                                        {/* Content Overlay */}
-                                        <div className="absolute inset-0 p-5 flex flex-col justify-between bg-gradient-to-t from-black/90 via-black/40 to-transparent">
-
-                                            {/* Top Actions */}
-                                            <div className="flex justify-between items-start opacity-0 group-hover:opacity-100 transition-opacity transform -translate-y-2 group-hover:translate-y-0 duration-300">
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded backdrop-blur-md ${project.status === 'In Progress' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-white/10 text-white'}`}>
-                                                    {project.status}
-                                                </span>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setDeleteConfirm({ show: true, type: 'project', id: project.id, title: project.title });
-                                                    }}
-                                                    className="w-6 h-6 flex items-center justify-center rounded-full bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-
-                                            {/* Bottom Info */}
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-60 text-white">
-                                                    {project.client}
-                                                </p>
-                                                <h3 className="text-xl font-bold leading-none mb-3 text-white">
-                                                    {project.title}
-                                                </h3>
-
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowMilestonesFor({ projectId: String(project.id), projectTitle: project.title });
-                                                            loadMilestones(String(project.id));
-                                                        }}
-                                                        className="px-3 py-2 rounded bg-white/10 text-white text-[10px] font-bold uppercase hover:bg-white/20 transition-colors"
-                                                    >
-                                                        📋 Adımlar
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setSelectedProject(project)}
-                                                        className="flex-1 py-2 rounded bg-[#a62932] text-white text-[10px] font-bold uppercase hover:bg-[#a62932]/80 transition-colors shadow-lg shadow-red-900/20"
-                                                    >
-                                                        View Details
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                    <ProjectsTab
+                        projects={projects}
+                        isAdminNight={isAdminNight}
+                        searchQuery={searchQuery}
+                        setDeleteConfirm={setDeleteConfirm}
+                        setSelectedProject={setSelectedProject}
+                        setShowMilestonesFor={setShowMilestonesFor}
+                        loadMilestones={loadMilestones}
+                    />
                 )}
 
                 {/* Accounts / Cari Hesap View */}
                 {activeTab === 'accounts' && (
-                    <div className="space-y-6">
-                        <div className={`rounded-xl border overflow-hidden ${isAdminNight ? 'bg-[#0a0a0a]/20 border-white/5' : 'bg-white/60 border-black/5'}`}>
-                            <table className="w-full text-left">
-                                <thead className={`text-[10px] uppercase font-bold tracking-widest ${isAdminNight ? 'bg-white/5 text-white/40' : 'bg-black/5 text-black/40'}`}>
-                                    <tr>
-                                        <th className="p-6">Client / Company</th>
-                                        <th className="p-6">Status</th>
-                                        <th className="p-6 text-right">Total Debt</th>
-                                        <th className="p-6 text-right">Total Paid</th>
-                                        <th className="p-6 text-right">Balance</th>
-                                        <th className="p-6 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {accounts.map((account, i) => (
-                                        <tr key={account.id} className={`border-b last:border-0 hover:bg-current/5 transition-colors ${isAdminNight ? 'border-white/5' : 'border-black/5'}`}>
-                                            <td className="p-6">
-                                                <h4 className="font-bold">{account.name}</h4>
-                                                <p className="text-xs opacity-40">{account.company}</p>
-                                            </td>
-                                            <td className="p-6">
-                                                <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${account.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'}`}>
-                                                    {account.status}
-                                                </span>
-                                            </td>
-                                            <td className="p-6 text-right font-mono text-sm opacity-60">
-                                                ₺{account.totalDebt.toLocaleString()}
-                                            </td>
-                                            <td className="p-6 text-right font-mono text-sm text-green-500">
-                                                ₺{account.totalPaid.toLocaleString()}
-                                            </td>
-                                            <td className="p-6 text-right font-mono font-bold text-lg">
-                                                <span className={account.balance > 0 ? 'text-red-500' : 'text-gray-500'}>
-                                                    ₺{account.balance.toLocaleString()}
-                                                </span>
-                                            </td>
-                                            <td className="p-6 text-right flex justify-end gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setEditCredAccountId(String(account.id));
-                                                        setEditCredUsername(account.username || '');
-                                                        setEditCredPassword('');
-                                                    }}
-                                                    className="px-3 py-1 rounded border border-current/20 text-xs font-bold hover:bg-current/10 transition-colors"
-                                                    title="Kullanıcı adı / şifre değiştir"
-                                                >
-                                                    🔑
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setHistoryAccountId(account.id);
-                                                        setShowHistoryModal(true);
-                                                    }}
-                                                    className="px-3 py-1 rounded border border-current/20 text-xs font-bold hover:bg-current/10 transition-colors"
-                                                >
-                                                    History
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedAccountId(account.id);
-                                                        setTransType('Debt'); // Default
-                                                        setShowTransactionModal(true);
-                                                    }}
-                                                    className="px-3 py-1 rounded bg-[#a62932] text-white text-xs font-bold hover:bg-[#a62932]/80 transition-colors"
-                                                >
-                                                    + Transaction
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeleteConfirm({ show: true, type: 'account', id: account.id, title: account.name })}
-                                                    className="px-3 py-1 rounded border border-red-500/30 text-red-500 text-xs font-bold hover:bg-red-500/10 transition-colors"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {accounts.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="p-12 text-center opacity-40 text-sm">
-                                                No accounts found. Start by adding a new client.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <AccountsTab
+                        accounts={accounts}
+                        isAdminNight={isAdminNight}
+                        searchQuery={searchQuery}
+                        setDeleteConfirm={setDeleteConfirm}
+                        setEditCredAccountId={setEditCredAccountId}
+                        setEditCredUsername={setEditCredUsername}
+                        setEditCredPassword={setEditCredPassword}
+                        setHistoryAccountId={setHistoryAccountId}
+                        setShowHistoryModal={setShowHistoryModal}
+                        setSelectedAccountId={setSelectedAccountId}
+                        setTransType={setTransType}
+                        setShowTransactionModal={setShowTransactionModal}
+                    />
                 )}
 
                 {/* Finance View */}
                 {activeTab === 'finance' && (
-                    <div className="space-y-8">
-                        {/* Header & Actions */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            {/* Ticker Tape */}
-                            <div className="flex gap-6 overflow-hidden whitespace-nowrap opacity-50 text-xs font-mono">
-                                <span className="text-green-500">USD/TRY: 34.50 (+0.2%)</span>
-                                <span className="text-green-500">EUR/TRY: 37.20 (+0.1%)</span>
-                                <span>NASDAQ: 18,400</span>
-                            </div>
-
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => setShowExpenseModal(true)}
-                                    className={`px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all hover:scale-105 active:scale-95 ${isAdminNight ? 'border-white/20 hover:bg-white/10' : 'border-black/20 hover:bg-black/5'}`}
-                                >
-                                    + Add Expense
-                                </button>
-                                <button
-                                    onClick={() => setShowInvoiceModal(true)}
-                                    className="px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest bg-[#a62932] text-white shadow-lg shadow-[#a62932]/20 transition-all hover:scale-105 active:scale-95 hover:bg-[#a62932]/90"
-                                >
-                                    + New Invoice
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* P&L Summary */}
-                            <div className={`border p-8 rounded-xl ${isAdminNight ? 'bg-[#0a0a0a]/20 border-white/5' : 'bg-white/60 border-black/5'}`}>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest opacity-40">Profit & Loss</h3>
-                                    <span className="text-xs opacity-30 font-mono">YTD 2026</span>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <span>Total Income</span>
-                                        <span className="text-green-500 font-bold">₺{revenueVal.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Total Expenses</span>
-                                        <span className="text-red-500 font-bold">-₺{expenseVal.toLocaleString()}</span>
-                                    </div>
-                                    <div className="h-px bg-current/10 my-2"></div>
-                                    <div className="flex justify-between items-center text-xl font-bold">
-                                        <span>Net Profit</span>
-                                        <span className={netProfit > 0 ? 'text-green-500' : 'text-red-500'}>₺{netProfit.toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Expenses List */}
-                            <div className={`border p-8 rounded-xl ${isAdminNight ? 'bg-[#0a0a0a]/20 border-white/5' : 'bg-white/60 border-black/5'}`}>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest opacity-40">Recent Expenses</h3>
-                                    <button className="text-[10px] opacity-40 hover:opacity-100 uppercase font-bold">View All</button>
-                                </div>
-                                <div className="space-y-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {expenses.length === 0 ? (
-                                        <div className="text-center py-8 opacity-50">
-                                            <div className="text-3xl mb-2">💸</div>
-                                            <p className="text-sm">Henüz gider kaydı yok</p>
-                                        </div>
-                                    ) : (
-                                        expenses.map(exp => (
-                                            <div key={exp.id} className="flex justify-between items-center group py-2 border-b border-white/5 last:border-0">
-                                                <div>
-                                                    <p className="font-bold text-sm">{exp.title}</p>
-                                                    <p className="text-[10px] opacity-40">{exp.category} • {exp.date}</p>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <span className="font-mono text-sm">{exp.amount} {exp.currency}</span>
-                                                    <button onClick={() => setDeleteConfirm({ show: true, type: 'expense', id: exp.id, title: exp.title })} className="opacity-0 group-hover:opacity-100 text-red-500 text-xs hover:bg-red-500/10 p-1 rounded transition-all">✕</button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Invoices (Existing) */}
-                        <div>
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-sm font-bold uppercase tracking-widest opacity-40">Invoices</h3>
-                                <div className="flex gap-2">
-                                    <span className="text-[10px] px-2 py-1 bg-green-500/10 text-green-500 rounded">Paid: {invoices.filter(i => i.status === 'Paid').length}</span>
-                                    <span className="text-[10px] px-2 py-1 bg-yellow-500/10 text-yellow-500 rounded">Pending: {invoices.filter(i => i.status === 'Pending').length}</span>
-                                </div>
-                            </div>
-                            <div className="grid gap-4">
-                                {invoices.length === 0 ? (
-                                    <div className={`text-center py-12 rounded-xl border-2 border-dashed ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
-                                        <div className="text-4xl mb-3">🧾</div>
-                                        <h4 className="font-bold mb-1">Henüz Fatura Yok</h4>
-                                        <p className="text-sm opacity-50">Yeni fatura oluşturmak için yukarıdaki butonu kullanın</p>
-                                    </div>
-                                ) : (
-                                    invoices.map(invoice => (
-                                        <div key={invoice.id} className={`p-6 rounded-xl border flex items-center justify-between transition-colors hover:border-[#a62932]/30 ${isAdminNight ? 'bg-[#0a0a0a]/20 border-white/5' : 'bg-white/60 border-black/5'}`}>
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${invoice.status === 'Paid' ? 'bg-green-500/10 text-green-500' : invoice.status === 'Overdue' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                                                    {invoice.status === 'Paid' ? '✓' : invoice.status === 'Overdue' ? '!' : '⟳'}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold">{invoice.client}</h4>
-                                                    <p className="text-xs opacity-40">INV-{invoice.id} • {invoice.date}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-lg">{invoice.amount}</p>
-                                                <p className="text-[10px] opacity-40">{invoice.date}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <FinanceTab
+                        isAdminNight={isAdminNight}
+                        searchQuery={searchQuery}
+                        exchangeRates={exchangeRates}
+                        ratesLastUpdated={ratesLastUpdated}
+                        revenueVal={revenueVal}
+                        expenseVal={expenseVal}
+                        netProfit={netProfit}
+                        expenses={expenses}
+                        setShowExpenseModal={setShowExpenseModal}
+                        setDeleteConfirm={setDeleteConfirm}
+                    />
                 )}
 
                 {/* Team View REMOVED per user request */}
 
                 {/* Proposals View */}
                 {activeTab === 'proposals' && (
-                    <div className="grid gap-6">
-                        {proposals.length === 0 && <p className="opacity-40 text-center py-20">No proposals found.</p>}
-                        {proposals.map(proposal => (
-                            <div key={proposal.id} className={`p-6 rounded-xl border group transition-all ${isAdminNight ? 'bg-[#0a0a0a]/20 border-white/5' : 'bg-white/60 border-black/5'}`}>
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="font-bold text-lg">{proposal.title}</h3>
-                                            <span className={`text-[10px] px-2 py-1 rounded uppercase tracking-widest font-bold ${proposal.status === 'Sent' ? 'bg-blue-500/10 text-blue-500' :
-                                                proposal.status === 'Accepted' ? 'bg-green-500/10 text-green-500' :
-                                                    'bg-current/5 opacity-50'
-                                                }`}>
-                                                {proposal.status}
-                                            </span>
-                                        </div>
-                                        <p className="opacity-60 text-sm mb-4">{proposal.clientName} • Valid until {proposal.validUntil}</p>
-
-                                        <div className="flex gap-3 mt-4">
-                                            <button
-                                                onClick={() => setEditingProposal(proposal)}
-                                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${isAdminNight ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'}`}
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => setPrintingProposal(proposal)}
-                                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${isAdminNight ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                                                Print
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteConfirm({ show: true, type: 'proposal', id: proposal.id, title: proposal.title })}
-                                                className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 text-red-500/60 hover:text-red-500 hover:bg-red-500/10"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-2xl font-bold">₺{proposal.totalAmount.toLocaleString()}</p>
-                                    <p className="text-[10px] opacity-40 uppercase tracking-widest mt-1">Total Value</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <ProposalsTab
+                        proposals={proposals}
+                        isAdminNight={isAdminNight}
+                        searchQuery={searchQuery}
+                        setDeleteConfirm={setDeleteConfirm}
+                        setEditingProposal={setEditingProposal}
+                        setPrintingProposal={setPrintingProposal}
+                    />
                 )}
 
                 {/* Inbox View */}
@@ -1459,54 +1134,7 @@ export default function AdminDashboard() {
             <AnimatePresence>
 
 
-                {
-                    showInvoiceModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => setShowInvoiceModal(false)}>
-                            <motion.div
-                                initial={{ scale: 0.9, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.9, opacity: 0 }}
-                                onClick={e => e.stopPropagation()}
-                                className={`rounded-2xl w-full max-w-md overflow-hidden ${isAdminNight ? 'bg-[#0a0a0a] border border-white/10' : 'bg-white shadow-2xl'}`}
-                            >
-                                {/* Modal Header */}
-                                <div className={`px-8 py-6 border-b flex justify-between items-center ${isAdminNight ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/[0.02]'}`}>
-                                    <div>
-                                        <h3 className="text-lg font-bold">Create Invoice</h3>
-                                        <p className="text-xs opacity-40 mt-0.5">Issue a new invoice to a client</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowInvoiceModal(false)}
-                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isAdminNight ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
-                                    >
-                                        <svg className="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </div>
 
-                                {/* Modal Body */}
-                                <form onSubmit={handleCreateInvoice} className="p-8 space-y-6">
-                                    <div>
-                                        <label className="text-[10px] uppercase font-bold tracking-widest opacity-40 block mb-2">Client Name</label>
-                                        <input placeholder="e.g. Nordic Exploration" value={newInvClient} onChange={e => setNewInvClient(e.target.value)} required className={`w-full bg-transparent border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#a62932]/50 transition-all ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] uppercase font-bold tracking-widest opacity-40 block mb-2">Amount</label>
-                                        <input placeholder="₺45,000" value={newInvAmount} onChange={e => setNewInvAmount(e.target.value)} required className={`w-full bg-transparent border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#a62932]/50 transition-all ${isAdminNight ? 'border-white/10' : 'border-black/10'}`} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] uppercase font-bold tracking-widest opacity-40 block mb-2">Status</label>
-                                        <select value={newInvStatus} onChange={e => setNewInvStatus(e.target.value as any)} className={`w-full bg-transparent border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#a62932]/50 transition-all ${isAdminNight ? 'border-white/10' : 'border-black/10'}`}>
-                                            <option value="Pending">Pending</option>
-                                            <option value="Paid">Paid</option>
-                                            <option value="Overdue">Overdue</option>
-                                        </select>
-                                    </div>
-                                    <button type="submit" className="w-full bg-[#a62932] text-white font-bold uppercase tracking-widest text-xs py-4 rounded-xl shadow-lg shadow-[#a62932]/20 hover:shadow-[#a62932]/40 hover:scale-[1.01] active:scale-[0.99] transition-all">Issue Invoice</button>
-                                </form>
-                            </motion.div>
-                        </div>
-                    )
-                }
 
                 {
                     showExpenseModal && (

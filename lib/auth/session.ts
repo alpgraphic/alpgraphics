@@ -62,6 +62,22 @@ export async function createSession(
         path: '/',
     });
 
+    cookieStore.set('user_id', userId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: SESSION_DURATION_MS / 1000,
+        path: '/',
+    });
+
+    cookieStore.set('session_expiry', String(now.getTime() + SESSION_DURATION_MS), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: SESSION_DURATION_MS / 1000,
+        path: '/',
+    });
+
     return token;
 }
 
@@ -183,6 +199,8 @@ export async function destroySession(): Promise<void> {
 
         cookieStore.delete('session_token');
         cookieStore.delete('user_role');
+        cookieStore.delete('user_id');
+        cookieStore.delete('session_expiry');
     } catch (error) {
         console.error('Session destruction error:', error);
     }

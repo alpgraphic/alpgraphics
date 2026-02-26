@@ -87,12 +87,16 @@ export function middleware(request: NextRequest) {
     if (path.startsWith('/admin')) {
         const sessionToken = request.cookies.get('session_token')?.value;
         const userRole = request.cookies.get('user_role')?.value;
+        const userId = request.cookies.get('user_id')?.value;
+        const sessionExpiry = request.cookies.get('session_expiry')?.value;
 
-        if (!sessionToken || userRole !== 'admin') {
+        if (!sessionToken || !userId || userRole !== 'admin') {
             const res = NextResponse.redirect(new URL('/login', request.url));
             if (sessionToken && userRole !== 'admin') {
                 res.cookies.delete('session_token');
                 res.cookies.delete('user_role');
+                res.cookies.delete('user_id');
+                res.cookies.delete('session_expiry');
             }
             return res;
         }
@@ -102,7 +106,22 @@ export function middleware(request: NextRequest) {
             const res = NextResponse.redirect(new URL('/login', request.url));
             res.cookies.delete('session_token');
             res.cookies.delete('user_role');
+            res.cookies.delete('user_id');
+            res.cookies.delete('session_expiry');
             return res;
+        }
+
+        // Check session expiry timestamp (if set)
+        if (sessionExpiry) {
+            const expiryTime = parseInt(sessionExpiry, 10);
+            if (!isNaN(expiryTime) && Date.now() > expiryTime) {
+                const res = NextResponse.redirect(new URL('/login', request.url));
+                res.cookies.delete('session_token');
+                res.cookies.delete('user_role');
+                res.cookies.delete('user_id');
+                res.cookies.delete('session_expiry');
+                return res;
+            }
         }
     }
 
@@ -110,9 +129,24 @@ export function middleware(request: NextRequest) {
     if (path.startsWith('/client')) {
         const sessionToken = request.cookies.get('session_token')?.value;
         const userRole = request.cookies.get('user_role')?.value;
+        const userId = request.cookies.get('user_id')?.value;
+        const sessionExpiry = request.cookies.get('session_expiry')?.value;
 
-        if (!sessionToken || (userRole !== 'client' && userRole !== 'admin')) {
+        if (!sessionToken || !userId || (userRole !== 'client' && userRole !== 'admin')) {
             return NextResponse.redirect(new URL('/login', request.url));
+        }
+
+        // Check session expiry timestamp (if set)
+        if (sessionExpiry) {
+            const expiryTime = parseInt(sessionExpiry, 10);
+            if (!isNaN(expiryTime) && Date.now() > expiryTime) {
+                const res = NextResponse.redirect(new URL('/login', request.url));
+                res.cookies.delete('session_token');
+                res.cookies.delete('user_role');
+                res.cookies.delete('user_id');
+                res.cookies.delete('session_expiry');
+                return res;
+            }
         }
     }
 
