@@ -292,8 +292,21 @@ export async function ensureIndexes(): Promise<void> {
     try {
         const db = await getDb();
 
-        // Accounts: unique email, unique username (sparse), briefToken lookup
-        await db.collection('accounts').createIndex({ email: 1 }, { unique: true, sparse: true });
+        // --- MIGRATION: Fix email field ---
+        // 1. Remove email: null from existing documents so sparse unique index can be created
+        await db.collection('accounts').updateMany(
+            { email: null },
+            { $unset: { email: '' } }
+        );
+        // 2. Drop old non-sparse email_1 index if it exists (ignore error if not found)
+        try {
+            await db.collection('accounts').dropIndex('email_1');
+        } catch {
+            // Index didn't exist — that's fine
+        }
+
+        // Accounts: unique email (sparse — null/missing emails are excluded), unique username (sparse), briefToken lookup
+        await db.collection('accounts').createIndex({ email: 1 }, { unique: true, sparse: true, name: 'email_sparse_unique' });
         await db.collection('accounts').createIndex({ username: 1 }, { unique: true, sparse: true });
         await db.collection('accounts').createIndex({ briefToken: 1 }, { sparse: true });
 
