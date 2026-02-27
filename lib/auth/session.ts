@@ -20,7 +20,7 @@ export interface SessionData {
  */
 export async function createSession(
     userId: string,
-    userEmail: string,
+    userEmail: string | undefined,
     role: 'admin' | 'client',
     ipAddress?: string,
     userAgent?: string

@@ -51,7 +51,7 @@ async function getTokenFromCookies(): Promise<{ accessToken: string | null; role
  */
 export async function createMobileSession(
     userId: string,
-    userEmail: string,
+    userEmail: string | undefined,
     role: 'admin' | 'client',
 ): Promise<{ accessToken: string; refreshToken: string }> {
     const sessions = await getSessionsCollection();

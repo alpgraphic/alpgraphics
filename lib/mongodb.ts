@@ -250,7 +250,7 @@ export interface DbSession {
     _id?: string;
     token: string;
     userId: string;
-    userEmail: string;
+    userEmail?: string;
     role: 'admin' | 'client';
     ipAddress?: string;
     userAgent?: string;
