@@ -690,7 +690,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
                 body: JSON.stringify({
                     name: account.name,
                     company: account.company,
-                    email: account.email,
+                    email: account.email || undefined,
                     username: account.username,
                     password: account.password || undefined,
                     briefFormType: account.briefFormType || 'none'

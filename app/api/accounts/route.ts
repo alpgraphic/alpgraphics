@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const { name, company, email, username, password, briefFormType } = body;
+        const normalizedEmail = email && email.trim() ? email.trim().toLowerCase() : undefined;
 
         if (!name || !company || !username) {
             return NextResponse.json(
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
 
         // Check if username or email already exists
         const existingQuery: any[] = [{ username: usernameStr }];
-        if (email) existingQuery.push({ email: email.toLowerCase().trim() });
+        if (normalizedEmail) existingQuery.push({ email: normalizedEmail });
         const existing = await accounts.findOne({ $or: existingQuery });
 
         if (existing) {
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
         const newAccount: DbAccount = {
             name,
             company,
-            email: email ? email.toLowerCase() : `${usernameStr}@alpgraphics.local`,
+            email: normalizedEmail,
             username: usernameStr,
             passwordHash,
             briefToken, // Unique token for brief form URL
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
                 id: result.insertedId.toString(),
                 name,
                 company,
-                email: email ? email.toLowerCase() : `${usernameStr}@alpgraphics.local`,
+                email: normalizedEmail,
                 username: usernameStr,
                 briefFormType: newAccount.briefFormType,
                 briefStatus: newAccount.briefStatus,

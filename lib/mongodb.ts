@@ -293,7 +293,7 @@ export async function ensureIndexes(): Promise<void> {
         const db = await getDb();
 
         // Accounts: unique email, unique username (sparse), briefToken lookup
-        await db.collection('accounts').createIndex({ email: 1 }, { unique: true });
+        await db.collection('accounts').createIndex({ email: 1 }, { unique: true, sparse: true });
         await db.collection('accounts').createIndex({ username: 1 }, { unique: true, sparse: true });
         await db.collection('accounts').createIndex({ briefToken: 1 }, { sparse: true });
 
