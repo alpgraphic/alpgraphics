@@ -88,6 +88,8 @@ export default function AdminDashboard() {
     const [newAccountPassword, setNewAccountPassword] = useState('');
     const [newAccountBriefType, setNewAccountBriefType] = useState<'logo' | 'brand-identity' | 'web-design' | 'social-media' | 'packaging' | 'general' | 'none'>('none');
     const [newAccountUsername, setNewAccountUsername] = useState('');
+    const [accountFormError, setAccountFormError] = useState<string | null>(null);
+    const [accountFormErrorDetails, setAccountFormErrorDetails] = useState<string[]>([]);
     // Credential edit states
     const [editCredAccountId, setEditCredAccountId] = useState<string | null>(null);
     const [editCredUsername, setEditCredUsername] = useState('');
@@ -239,9 +241,10 @@ export default function AdminDashboard() {
 
     const handleAddAccount = async (e: React.FormEvent) => {
         e.preventDefault();
+        setAccountFormError(null);
+        setAccountFormErrorDetails([]);
 
-        // Use context action which handles API call and state update
-        addAccount({
+        const result = await addAccount({
             id: crypto.randomUUID(),
             name: newAccountName,
             company: newAccountCompany,
@@ -257,14 +260,22 @@ export default function AdminDashboard() {
             transactions: []
         });
 
-        // Close modal and reset form
-        setShowAccountModal(false);
-        setNewAccountName('');
-        setNewAccountCompany('');
-        setNewAccountEmail('');
-        setNewAccountPassword('');
-        setNewAccountUsername('');
-        setNewAccountBriefType('none');
+        if (result.success) {
+            // Close modal and reset form only on success
+            setShowAccountModal(false);
+            setNewAccountName('');
+            setNewAccountCompany('');
+            setNewAccountEmail('');
+            setNewAccountPassword('');
+            setNewAccountUsername('');
+            setNewAccountBriefType('none');
+            setAccountFormError(null);
+            setAccountFormErrorDetails([]);
+        } else {
+            // Show error in form, keep modal open
+            setAccountFormError(result.error || 'Hesap oluşturulamadı');
+            setAccountFormErrorDetails(result.details || []);
+        }
     };
 
     const handleSaveCredentials = async () => {
@@ -888,6 +899,13 @@ export default function AdminDashboard() {
                                                         View ↗
                                                     </a>
                                                 )}
+                                                <button
+                                                    onClick={() => setDeleteConfirm({ show: true, type: 'project', id: project.id, title: project.title })}
+                                                    className="px-3 py-2 text-sm font-bold border border-red-500/30 text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
+                                                    title="Sil"
+                                                >
+                                                    ✕
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1485,7 +1503,7 @@ export default function AdminDashboard() {
 
                 {
                     showAccountModal && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => setShowAccountModal(false)}>
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => { setShowAccountModal(false); setAccountFormError(null); setAccountFormErrorDetails([]); }}>
                             <motion.div
                                 initial={{ scale: 0.9, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
@@ -1548,6 +1566,7 @@ export default function AdminDashboard() {
                                             onChange={e => setNewAccountPassword(e.target.value)}
                                             className={`w-full px-4 py-3 rounded-lg border ${isAdminNight ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} focus:border-[#a62932] focus:outline-none`}
                                         />
+                                        <p className="text-[10px] opacity-40 mt-1">Min. 8 karakter, en az 1 küçük harf ve 1 rakam içermelidir</p>
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-1">Brief Formu (Opsiyonel)</label>
@@ -1565,6 +1584,16 @@ export default function AdminDashboard() {
                                             <option value="general">📋 Genel Brief</option>
                                         </select>
                                     </div>
+                                    {accountFormError && (
+                                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+                                            <p className="font-semibold">{accountFormError}</p>
+                                            {accountFormErrorDetails.length > 0 && (
+                                                <ul className="mt-1 list-disc list-inside text-xs space-y-0.5">
+                                                    {accountFormErrorDetails.map((d, i) => <li key={i}>{d}</li>)}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    )}
                                     <button type="submit" className="w-full bg-[#a62932] text-white font-bold uppercase tracking-widest text-xs py-4 rounded-xl mt-4 hover:bg-[#c4323d] transition-colors">Hesap Oluştur</button>
                                 </form>
                             </motion.div>

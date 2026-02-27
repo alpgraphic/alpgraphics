@@ -288,7 +288,7 @@ interface AgencyContextType {
 
     // --- ACCOUNTS (Cari Hesap) ---
     accounts: Account[];
-    addAccount: (account: Account) => void;
+    addAccount: (account: Account) => Promise<{ success: boolean; error?: string; details?: string[] }>;
     updateAccount: (id: number | string, updates: Partial<Account>) => void;
     deleteAccount: (id: number | string) => void;
     addTransaction: (accountId: number | string, transaction: AccountTransaction) => void;
@@ -677,7 +677,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         fetchAccounts();
     }, [mounted]);
 
-    const addAccount = async (account: Account) => {
+    const addAccount = async (account: Account): Promise<{ success: boolean; error?: string; details?: string[] }> => {
         // Optimistic UI update
         const tempId = Date.now();
         const optimisticAccount = { ...account, id: tempId };
@@ -702,15 +702,16 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             if (data.success && data.account) {
                 // Replace optimistic account with real one from DB
                 setAccounts(prev => prev.map(acc => acc.id === tempId ? { ...acc, ...data.account, id: data.account.id } : acc));
+                return { success: true };
             } else {
                 // Revert on error
                 setAccounts(prev => prev.filter(acc => acc.id !== tempId));
-                setLastError(data.error || 'Hesap oluşturulamadı');
+                return { success: false, error: data.error || 'Hesap oluşturulamadı', details: data.details };
             }
         } catch (error) {
             console.error("Failed to create account:", error);
             setAccounts(prev => prev.filter(acc => acc.id !== tempId));
-            setLastError('Bağlantı hatası');
+            return { success: false, error: 'Bağlantı hatası' };
         }
     };
 
