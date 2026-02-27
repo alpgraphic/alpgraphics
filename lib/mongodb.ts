@@ -50,7 +50,7 @@ export interface DbAccount {
     _id?: string;
     name: string;
     company: string;
-    email: string;
+    email?: string;
     username?: string; // Unique login identifier (replaces email for auth)
     passwordHash?: string;
     // password field removed - only passwordHash should be used
