@@ -23,7 +23,6 @@ const options = {
     socketTimeoutMS: 45000,
 };
 
-let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === 'development') {
@@ -33,14 +32,20 @@ if (process.env.NODE_ENV === 'development') {
     };
 
     if (!globalWithMongo._mongoClientPromise) {
-        client = new MongoClient(uri, options);
-        globalWithMongo._mongoClientPromise = client.connect();
+        // Guard: only connect if URI is valid (prevents build-time crash)
+        if (uri) {
+            const client = new MongoClient(uri, options);
+            globalWithMongo._mongoClientPromise = client.connect();
+        } else {
+            globalWithMongo._mongoClientPromise = Promise.reject(new Error('MONGODB_URI is not set'));
+        }
     }
     clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-    // In production, create a new client
-    client = new MongoClient(uri, options);
-    clientPromise = client.connect();
+    // Guard: build sırasında URI yoksa throw etme, reject promise döndür
+    clientPromise = uri
+        ? new MongoClient(uri, options).connect()
+        : Promise.reject(new Error('MONGODB_URI is not set'));
 }
 
 export { clientPromise };
