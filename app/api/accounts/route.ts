@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         const newAccount: DbAccount = {
             name,
             company,
-            email: normalizedEmail,
+            ...(normalizedEmail ? { email: normalizedEmail } : {}),
             username: usernameStr,
             passwordHash,
             briefToken, // Unique token for brief form URL
